@@ -58,7 +58,7 @@ on the welcome screen).
 Requires **Python 3.12+** (tested with 3.13) on Windows 10/11 64-bit.
 
 ```bat
-git clone https://github.com/admkozlowskiPC/PhotoSort.git
+git clone https://github.com/vodkawithcola1/PhotoSort.git
 cd PhotoSort
 build.bat
 ```
