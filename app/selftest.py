@@ -68,7 +68,6 @@ def run(out_file: Path | None = None) -> int:
         from app.core.import_manager import Importer, collect_media_files
         from app.core.library_manager import Library
         from app.core.media_manager import Filters, MediaManager
-        from app.constants import UNSORTED_FOLDER
 
         holder = {}
 
@@ -108,7 +107,7 @@ def run(out_file: Path | None = None) -> int:
             lib = holder["lib"]
             mm = MediaManager(lib)
             lib.create_folder("Cel")
-            ids = mm.query_ids(UNSORTED_FOLDER, Filters())
+            ids = mm.query_ids(lib.unsorted, Filters())
             r = mm.move(ids[:1], "Cel")
             u = mm.undo_last()
             return f"przeniesiono {len(r.moved)}, cofnięto {len(u.moved)}"

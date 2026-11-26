@@ -193,7 +193,7 @@ class TopBar(QFrame):
         self.crumb_root.setCursor(Qt.CursorShape.PointingHandCursor)
         self.crumb_root.setToolTip(tr("{path}\nKliknij, aby wrócić do kolejki „{folder}”",
                                       path=ctrl.lib.root, folder=display_folder(UNSORTED_FOLDER)))
-        self.crumb_root.clicked.connect(lambda: ctrl.set_scope(UNSORTED_FOLDER))
+        self.crumb_root.clicked.connect(lambda: ctrl.set_scope(ctrl.lib.unsorted))
         self.crumb_sep = QLabel()
         self.crumb_cur = QLabel()
         self.crumb_cur.setObjectName("CrumbCurrent")
@@ -201,7 +201,7 @@ class TopBar(QFrame):
             lay.addWidget(w)
         self.back_btn = QPushButton(tr("Wróć do sortowania"))
         self.back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.back_btn.clicked.connect(lambda: ctrl.set_scope(UNSORTED_FOLDER))
+        self.back_btn.clicked.connect(lambda: ctrl.set_scope(ctrl.lib.unsorted))
         lay.addSpacing(8)
         lay.addWidget(self.back_btn)
         lay.addStretch(1)
@@ -281,7 +281,7 @@ class TopBar(QFrame):
         else:
             text = tr("Wszystkie multimedia") if scope == SCOPE_ALL else display_folder(scope)
         self.crumb_cur.setText(text)
-        self.back_btn.setVisible(scope.lower() != UNSORTED_FOLDER.lower())
+        self.back_btn.setVisible(not self.ctrl.lib.is_unsorted(scope))
 
     def _show_stats(self) -> None:
         if self.progress.stats:
@@ -651,7 +651,7 @@ class LibraryView(QWidget):
         if ctrl.filters.is_active():
             self.viewer.show_empty("search", tr("Brak plików pasujących do filtrów"),
                                    tr("Zmień lub wyczyść filtry, aby zobaczyć więcej zdjęć i filmów."))
-        elif ctrl.scope.lower() == UNSORTED_FOLDER.lower():
+        elif ctrl.lib.is_unsorted(ctrl.scope):
             if stats["total"] == 0:
                 self.viewer.show_empty("import", tr("Zacznij od zaimportowania zdjęć"),
                                        tr("Podłącz telefon, aparat lub pendrive albo wskaż folder na komputerze. "

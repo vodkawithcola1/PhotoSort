@@ -5,7 +5,9 @@ APP_NAME = "PhotoSort"
 APP_VERSION = "1.0.0"
 
 # Nazwy folderów wewnątrz biblioteki
-UNSORTED_FOLDER = "Do posortowania"
+UNSORTED_FOLDER = "Do posortowania"          # folder importu w bibliotekach tworzonych po polsku
+UNSORTED_FOLDER_EN = "To sort"               # …i w bibliotekach tworzonych po angielsku
+UNSORTED_NAMES = (UNSORTED_FOLDER, UNSORTED_FOLDER_EN)
 DATA_DIR = ".photosort"
 DB_FILE = "library.db"
 THUMBS_DIR = "thumbnails"

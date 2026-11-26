@@ -14,14 +14,13 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from app.constants import UNSORTED_FOLDER
 from app.database.database import Database
 from app.utils.paths import app_data_dir
 
 
 @dataclass
 class SessionState:
-    scope: str = UNSORTED_FOLDER
+    scope: str = ""   # pusty = folder importu biblioteki
     current_id: int | None = None
     current_index: int = 0
     sort: str = "date"

@@ -15,7 +15,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 
-from app.constants import SCOPE_ALL, SCOPE_DEVICE, UNSORTED_FOLDER
+from app.constants import SCOPE_ALL, SCOPE_DEVICE
 from app.core.import_manager import hash_file
 from app.core.library_manager import Library, LibraryError
 from app.core.media_manager import Filters, MediaManager, MoveResult
@@ -59,8 +59,9 @@ class LibraryController(QObject):
         self.mm = MediaManager(library)
         self.session = SessionManager(library.db)
         self.state: SessionState = self.session.load()
-        if self.state.scope != SCOPE_ALL and not (library.root / self.state.scope).is_dir():
-            self.state.scope = UNSORTED_FOLDER
+        if self.state.scope != SCOPE_ALL and (not self.state.scope
+                                              or not (library.root / self.state.scope).is_dir()):
+            self.state.scope = library.unsorted
         self.filters = Filters.from_dict(self.state.filters)
         self.ids: list[int] = []
         self.rows: dict[int, tuple] = {}
@@ -91,7 +92,7 @@ class LibraryController(QObject):
         self.device_order: list[int] = []    # idx plików jeszcze nieprzypisanych (od najnowszych)
         self.device_thumbs: dict[int, QPixmap] = {}
         self._device_thumb_failed: set[int] = set()
-        self._scope_before_device = UNSORTED_FOLDER
+        self._scope_before_device = library.unsorted
         self._pending_device: dict[int, dict] = {}
         # stos cofania w tej sesji: {"type": "move", "batch": n} | {"type": "device", ...}
         self._undo_tokens: list[dict] = []
@@ -462,10 +463,10 @@ class LibraryController(QObject):
         if switch_scope and self.scope == SCOPE_DEVICE:
             target = self._scope_before_device
             if target != SCOPE_ALL and not (self.lib.root / target).is_dir():
-                target = UNSORTED_FOLDER
+                target = self.lib.unsorted
             self.set_scope(target)
         elif self.scope == SCOPE_DEVICE:
-            self.state.scope = UNSORTED_FOLDER
+            self.state.scope = self.lib.unsorted
 
     def device_entry(self, mid: int):
         return self.device_entries.get(dev_idx(mid)) if mid is not None and mid < 0 else None
@@ -697,7 +698,7 @@ class LibraryController(QObject):
             return False
         self.state.positions.pop(name, None)
         if self.scope.lower() == name.lower():
-            self.set_scope(UNSORTED_FOLDER)
+            self.set_scope(self.lib.unsorted)
         self.folders_changed.emit()
         self.emit_stats()
         return True

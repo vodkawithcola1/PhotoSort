@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable
 
-from app.constants import DISK_SPACE_MARGIN, PARTIAL_SUFFIX, UNSORTED_FOLDER, media_kind
+from app.constants import DISK_SPACE_MARGIN, PARTIAL_SUFFIX, media_kind
 from app.core.library_manager import Library, rel_of
 from app.database.database import Database
 from app.i18n import tr
@@ -105,10 +105,11 @@ def hash_file(path: Path) -> str:
 class Importer:
     def __init__(self, library: Library, db: Database | None = None,
                  progress: Callable[[ImportStats, str], None] | None = None,
-                 is_cancelled: Callable[[], bool] | None = None, dest_folder: str = UNSORTED_FOLDER):
-        """dest_folder: folder biblioteki, do którego trafiają kopie (domyślnie „Do posortowania”;
+                 is_cancelled: Callable[[], bool] | None = None, dest_folder: str | None = None):
+        """dest_folder: folder biblioteki, do którego trafiają kopie (domyślnie folder importu biblioteki;
         w trybie „Sortuj z telefonu” — od razu folder tematyczny)."""
         self.lib = library
+        dest_folder = dest_folder or library.unsorted
         self.dest_folder = dest_folder
         self.duplicate_of: str | None = None   # ścieżka pliku w bibliotece przy wykrytym duplikacie
         self.db = db or library.open_db()

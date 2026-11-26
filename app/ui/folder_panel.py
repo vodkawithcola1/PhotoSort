@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel, Q
                                QListWidgetItem, QMenu, QPushButton, QStyle, QStyledItemDelegate,
                                QToolButton, QVBoxLayout)
 
-from app.constants import MIME_MEDIA_IDS, SCOPE_ALL, SCOPE_DEVICE, UNSORTED_FOLDER
+from app.constants import MIME_MEDIA_IDS, SCOPE_ALL, SCOPE_DEVICE
 from app.core.library_controller import LibraryController
 from app.i18n import display_folder, tr
 from app.ui import icons, theme
@@ -109,7 +109,7 @@ class FolderList(QListWidget):
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.drop_row = -1
-        self.current_scope = UNSORTED_FOLDER
+        self.current_scope = ""   # ustawiane przez FolderPanel na zakres kontrolera
         self.flash: dict[int, float] = {}
         self._anims = []
 

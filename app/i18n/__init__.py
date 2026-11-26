@@ -66,10 +66,11 @@ def system_language() -> str:
 def display_folder(name: str) -> str:
     """Name of a library folder as shown in the interface.
 
-    The special import folder keeps its Polish name on disk (existing libraries
-    depend on it) but is shown translated in the English interface.
+    The special import folder is named “Do posortowania” in libraries created in
+    Polish and “To sort” in libraries created in English; on screen it is always
+    shown in the current interface language.
     """
-    from app.constants import UNSORTED_FOLDER
-    if name and name.lower() == UNSORTED_FOLDER.lower():
+    from app.constants import UNSORTED_FOLDER, UNSORTED_NAMES
+    if name and name.lower() in (n.lower() for n in UNSORTED_NAMES):
         return tr(UNSORTED_FOLDER)  # i18n: ignore
     return name

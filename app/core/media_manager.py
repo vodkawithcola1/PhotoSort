@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
-from app.constants import SCOPE_ALL, UNSORTED_FOLDER
+from app.constants import SCOPE_ALL
 from app.core.library_manager import Library, LibraryError, rel_of
 from app.i18n import display_folder, tr
 from app.utils.paths import unique_path
@@ -88,10 +88,10 @@ class MediaManager:
         else:
             if f.status == "sorted":
                 clauses.append("folder <> ? COLLATE NOCASE")
-                params.append(UNSORTED_FOLDER)
+                params.append(self.lib.unsorted)
             elif f.status == "unsorted":
                 clauses.append("folder = ? COLLATE NOCASE")
-                params.append(UNSORTED_FOLDER)
+                params.append(self.lib.unsorted)
             if f.folder:
                 clauses.append("folder = ? COLLATE NOCASE")
                 params.append(f.folder)

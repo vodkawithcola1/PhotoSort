@@ -24,10 +24,10 @@ from typing import Callable
 
 from app.constants import (
     DATA_DIR, DB_FILE, PARTIAL_SUFFIX, SETTINGS_FILE, STAGING_DIR, THUMBS_DIR,
-    UNSORTED_FOLDER, media_kind,
+    UNSORTED_FOLDER, UNSORTED_FOLDER_EN, UNSORTED_NAMES, media_kind,
 )
 from app.database.database import Database
-from app.i18n import display_folder, tr
+from app.i18n import display_folder, is_english, tr
 from app.utils.formatting import pl_sort_key
 from app.utils.paths import file_creation_time, is_hidden_name, set_hidden, validate_folder_name
 
@@ -49,6 +49,11 @@ def is_library(path: Path) -> bool:
     return (Path(path) / DATA_DIR / DB_FILE).is_file()
 
 
+def _reserved(name: str) -> bool:
+    """Nazwy folderu importu (polska i angielska) są zarezerwowane dla folderu importu."""
+    return name.lower() in (n.lower() for n in UNSORTED_NAMES)
+
+
 def rel_of(folder: str, filename: str) -> str:
     return f"{folder}/{filename}"
 
@@ -60,7 +65,9 @@ class Library:
         self.db_path = self.data_dir / DB_FILE
         self.thumbs_dir = self.data_dir / THUMBS_DIR
         self.staging_dir = self.data_dir / STAGING_DIR
-        self.unsorted_dir = self.root / UNSORTED_FOLDER
+        # nazwa folderu importu zależy od języka, w którym utworzono bibliotekę
+        self.unsorted = self._detect_unsorted()
+        self.unsorted_dir = self.root / self.unsorted
         self.db = Database(self.db_path)
         # Serializuje skan, przenoszenie i rejestrację importu — chroni indeks przed wyścigami.
         self.lock = threading.RLock()
@@ -81,13 +88,14 @@ class Library:
         if not Path(parent).is_dir():
             raise LibraryError(tr("Lokalizacja nie istnieje: {path}", path=parent))
         root.mkdir()
-        (root / UNSORTED_FOLDER).mkdir()
+        unsorted = UNSORTED_FOLDER_EN if is_english() else UNSORTED_FOLDER
+        (root / unsorted).mkdir()
         data = root / DATA_DIR
         data.mkdir()
         (data / THUMBS_DIR).mkdir()
         (data / STAGING_DIR).mkdir()
         set_hidden(data)
-        settings = {"name": name.strip(), "created": time.time(), "version": 1}
+        settings = {"name": name.strip(), "created": time.time(), "version": 1, "unsorted_folder": unsorted}
         (data / SETTINGS_FILE).write_text(json.dumps(settings, ensure_ascii=False, indent=2), "utf-8")
         lib = cls(root)
         lib.db.init_schema()
@@ -103,12 +111,30 @@ class Library:
             raise LibraryError(tr("Wybrany folder nie jest biblioteką PhotoSort."))
         for sub in (THUMBS_DIR, STAGING_DIR):
             (data / sub).mkdir(exist_ok=True)
-        (root / UNSORTED_FOLDER).mkdir(exist_ok=True)
         lib = cls(root)
+        lib.unsorted_dir.mkdir(exist_ok=True)
         lib.db.init_schema()
         lib.recover_interrupted_moves()
         lib.cleanup_partials()
         return lib
+
+    def _detect_unsorted(self) -> str:
+        """Nazwa folderu importu: zapisana w ustawieniach biblioteki albo wykryta na dysku.
+
+        Biblioteki sprzed obsługi języka angielskiego zawsze używają „Do posortowania”.
+        """
+        try:
+            saved = json.loads((self.data_dir / SETTINGS_FILE).read_text("utf-8")).get("unsorted_folder")
+        except (OSError, ValueError, AttributeError):
+            saved = None
+        if saved in (UNSORTED_FOLDER, UNSORTED_FOLDER_EN):
+            return saved
+        if not (self.root / UNSORTED_FOLDER).is_dir() and (self.root / UNSORTED_FOLDER_EN).is_dir():
+            return UNSORTED_FOLDER_EN
+        return UNSORTED_FOLDER
+
+    def is_unsorted(self, folder: str | None) -> bool:
+        return bool(folder) and folder.lower() == self.unsorted.lower()
 
     @property
     def name(self) -> str:
@@ -308,7 +334,7 @@ class Library:
                 count=r["n"] if r else 0,
                 photos=(r["p"] or 0) if r else 0,
                 videos=(r["v"] or 0) if r else 0,
-                is_unsorted=name.lower() == UNSORTED_FOLDER.lower(),
+                is_unsorted=self.is_unsorted(name),
             ))
         result.sort(key=lambda f: (not f.is_unsorted, pl_sort_key(f.name)))
         return result
@@ -319,13 +345,13 @@ class Library:
             raise LibraryError(error)
         name = name.strip()
         target = self.root / name
-        if target.exists() or name.lower() in {d.lower() for d in self.folder_dirs()}:
+        if target.exists() or _reserved(name) or name.lower() in {d.lower() for d in self.folder_dirs()}:
             raise LibraryError(tr("Folder „{folder}” już istnieje.", folder=display_folder(name)))
         target.mkdir()
         return name
 
     def rename_folder(self, old: str, new: str) -> str:
-        if old.lower() == UNSORTED_FOLDER.lower():
+        if self.is_unsorted(old):
             raise LibraryError(tr("Folderu „Do posortowania” nie można zmienić."))
         error = validate_folder_name(new)
         if error:
@@ -335,7 +361,7 @@ class Library:
             return new
         src = self.root / old
         dst = self.root / new
-        if new.lower() != old.lower() and (dst.exists() or new.lower() == UNSORTED_FOLDER.lower()):
+        if new.lower() != old.lower() and (dst.exists() or _reserved(new)):
             raise LibraryError(tr("Folder „{folder}” już istnieje.", folder=display_folder(new)))
         try:
             os.rename(src, dst)
@@ -355,7 +381,7 @@ class Library:
 
     def delete_folder(self, name: str) -> None:
         """Usuwa wyłącznie pusty folder."""
-        if name.lower() == UNSORTED_FOLDER.lower():
+        if self.is_unsorted(name):
             raise LibraryError(tr("Folderu „Do posortowania” nie można usunąć."))
         target = self.root / name
         if not target.is_dir():
@@ -377,11 +403,11 @@ class Library:
     def stats(self) -> dict:
         r = self.db.query_one(
             "SELECT COUNT(*) AS total, SUM(kind='photo') AS photos, SUM(kind='video') AS videos, "
-            "SUM(folder=? COLLATE NOCASE) AS unsorted FROM media", (UNSORTED_FOLDER,))
+            "SUM(folder=? COLLATE NOCASE) AS unsorted FROM media", (self.unsorted,))
         total = r["total"] or 0
         unsorted = r["unsorted"] or 0
         sorted_ = total - unsorted
-        folders = len([f for f in self.folder_dirs() if f.lower() != UNSORTED_FOLDER.lower()])
+        folders = len([f for f in self.folder_dirs() if not self.is_unsorted(f)])
         return {
             "total": total,
             "photos": r["photos"] or 0,
