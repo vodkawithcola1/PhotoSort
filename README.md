@@ -17,6 +17,10 @@
 
 ## About
 
+<p align="center">
+  <img src="docs/screenshot-welcome.png" alt="PhotoSort welcome screen" width="800">
+</p>
+
 PhotoSort is a desktop application for **manually** organising large collections of family photos and
 videos with **drag and drop**.
 
@@ -96,6 +100,10 @@ Use **Open an existing library** to continue working on a library you created ea
 
 ### 2. Import photos and videos
 
+<p align="center">
+  <img src="docs/screenshot-library.png" alt="A new, empty PhotoSort library ready for import" width="800">
+</p>
+
 Click **Import photos and videos** and choose the source:
 
 | Source | What happens |
@@ -167,7 +175,7 @@ and the history of moves.
 ```
 Desktop/
 └── Mum's photos/
-    ├── Do posortowania/          ← imports land here (shown as “To sort” in the English interface)
+    ├── To sort/                  ← imports land here
     ├── Christmas 2026/
     ├── Holidays/
     └── .photosort/               (hidden)
@@ -178,8 +186,7 @@ Desktop/
 ```
 
 Folders are ordinary Windows folders — you can open them in Explorer or even uninstall the program;
-your photos stay where they are. (The import folder keeps the name `Do posortowania` on disk in both
-languages so that libraries work the same whichever language you use.)
+your photos stay where they are.
 
 ## File safety
 
