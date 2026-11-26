@@ -20,13 +20,14 @@ from pathlib import Path
 from typing import Callable
 
 from app.constants import DISK_SPACE_MARGIN, media_kind
+from app.i18n import tr
 
 SSF_DRIVES = 17  # „Ten komputer”
 # FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOCONFIRMMKDIR | FOF_NOERRORUI
 COPY_FLAGS = 4 | 16 | 512 | 1024
 
 MEDIA_FOLDER_HINTS = ("dcim", "camera", "pictures", "picture", "photos", "movies", "videos",
-                      "whatsapp", "screenshots", "zdjęcia", "obrazy", "aparat")
+                      "whatsapp", "screenshots", "zdjęcia", "obrazy", "aparat")  # i18n: ignore
 
 
 def available() -> bool:
@@ -319,7 +320,7 @@ def iter_newest(shell, device: str, folders: list[str], cancelled: Callable[[], 
             if cancelled():
                 break
             if pos and pos % 50 == 0:
-                status(f"Czytam daty plików: {rel}  ({pos} z {n})")
+                status(tr("Czytam daty plików: {folder}  ({done} z {total})", folder=rel, done=pos, total=n))
             try:
                 item = files[pos]
                 fname = str(_prop(item, "System.FileName") or item.Name)
@@ -349,7 +350,8 @@ def iter_newest(shell, device: str, folders: list[str], cancelled: Callable[[], 
     def open_folder(folder, rel: str, depth: int, leaf: bool = False) -> None:
         t0 = time.time()
         counters["folders"] += 1
-        status(f"Otwieram folder telefonu: {rel}  (otwarte foldery: {counters['folders']})")
+        status(tr("Otwieram folder telefonu: {folder}  (otwarte foldery: {count})", folder=rel,
+                   count=counters["folders"]))
         subs, files = _split_folder(folder, want_subs=not leaf)
         n = len(files)
         log.info("folder %s: %d plików, %d podfolderów (%.1fs)", rel, n, len(subs), time.time() - t0)
@@ -580,7 +582,7 @@ def _stream_copy(item, dest: Path, expected: int, cancelled: Callable[[], bool],
             out.flush()
             os.fsync(out.fileno())
         if done == 0:
-            raise DeviceCopyError("telefon zwrócił pusty plik")
+            raise DeviceCopyError(tr("telefon zwrócił pusty plik"))
         os.replace(part, dest)
     except InterruptedError:
         part.unlink(missing_ok=True)
@@ -636,8 +638,8 @@ def copy_item(shell, item, name: str, expected: int, slot: Path, cancelled: Call
     if cancelled():
         return None
     log.error("nie udało się skopiować %s z telefonu: %s", name, first_error)
-    raise DeviceCopyError(f"{name}: nie udało się skopiować z telefonu "
-                          f"(telefon zablokowany lub odłączony?)"
+    raise DeviceCopyError(tr("{name}: nie udało się skopiować z telefonu (telefon zablokowany lub odłączony?)",
+                             name=name)
                           + (f" — {_describe(first_error)}" if first_error else ""))
 
 
@@ -667,7 +669,7 @@ def _copy_one(shell, df: DeviceFile, key: str, importer, staging: Path, slot_no:
     stats = importer.stats
     if shutil.disk_usage(staging).free < df.size + DISK_SPACE_MARGIN:
         from app.core.import_manager import DiskFullError
-        raise DiskFullError("Brak miejsca na dysku — import został zatrzymany.")
+        raise DiskFullError(tr("Brak miejsca na dysku — import został zatrzymany."))
     slot = staging / f"{slot_no:06d}"
     slot.mkdir(parents=True, exist_ok=True)
     try:
@@ -681,7 +683,7 @@ def _copy_one(shell, df: DeviceFile, key: str, importer, staging: Path, slot_no:
         elif media_kind(staged.suffix):
             importer.import_file(staged, source_key=key, consume=True)
         else:
-            stats.errors.append(f"{staged.name}: nieobsługiwany format")
+            stats.errors.append(tr("{name}: nieobsługiwany format", name=staged.name))
     finally:
         shutil.rmtree(slot, ignore_errors=True)  # tylko nasza kopia tymczasowa
 
@@ -695,7 +697,7 @@ def _import_newest(shell, device, folders, importer, staging, progress, cancelle
     for n, df in enumerate(iter_newest(shell, device, folders, cancelled,
                                        lambda k: progress("scan", k, 0) if stats.copied == 0 else None)):
         if cancelled():
-            stats.aborted_reason = "Import przerwany przez użytkownika."
+            stats.aborted_reason = tr("Import przerwany przez użytkownika.")
             break
         stats.total = n + 1
         key = f"wpd:{device}/{df.rel}|{df.size}|{df.modified}"
@@ -738,8 +740,8 @@ def import_from_device(device: str, folders: list[str], importer, staging: Path,
         for rel in folders:
             folder = _navigate(shell, device, rel)
             if folder is None:
-                stats.errors.append(f"Nie znaleziono folderu na urządzeniu: {rel} "
-                                    "(odblokuj telefon i sprawdź połączenie).")
+                stats.errors.append(tr("Nie znaleziono folderu na urządzeniu: {folder} "
+                                       "(odblokuj telefon i sprawdź połączenie).", folder=rel))
                 continue
             _walk(folder, rel, files, cancelled, lambda n: progress("scan", n, 0))
         if limit:
@@ -753,7 +755,7 @@ def import_from_device(device: str, folders: list[str], importer, staging: Path,
                 stats.limit_reached = True
                 break
             if cancelled():
-                stats.aborted_reason = "Import przerwany przez użytkownika."
+                stats.aborted_reason = tr("Import przerwany przez użytkownika.")
                 break
             key = f"wpd:{device}/{df.rel}|{df.size}|{df.modified}"
             if importer.is_known_source(key):
@@ -763,7 +765,7 @@ def import_from_device(device: str, folders: list[str], importer, staging: Path,
                 continue
             free = shutil.disk_usage(staging).free
             if free < df.size + DISK_SPACE_MARGIN:
-                stats.aborted_reason = "Brak miejsca na dysku — import został zatrzymany."
+                stats.aborted_reason = tr("Brak miejsca na dysku — import został zatrzymany.")
                 break
             slot = staging / f"{i:06d}"
             slot.mkdir(exist_ok=True)
@@ -775,7 +777,7 @@ def import_from_device(device: str, folders: list[str], importer, staging: Path,
                     if media_kind(staged.suffix):
                         importer.import_file(staged, source_key=key, consume=True)
                     else:
-                        stats.errors.append(f"{staged.name}: nieobsługiwany format")
+                        stats.errors.append(tr("{name}: nieobsługiwany format", name=staged.name))
             except DiskFullError as exc:
                 stats.aborted_reason = str(exc)
                 break

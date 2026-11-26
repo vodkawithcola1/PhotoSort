@@ -9,8 +9,10 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel
                                QListWidgetItem, QMenu, QPushButton, QSizePolicy, QToolButton, QVBoxLayout,
                                QWidget)
 
+from app import i18n
 from app.constants import APP_NAME
 from app.core.library_manager import is_library
+from app.i18n import tr
 from app.ui import icons, theme
 from app.utils.paths import desktop_dir, validate_folder_name
 
@@ -18,7 +20,7 @@ from app.utils.paths import desktop_dir, validate_folder_name
 class NewLibraryDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Nowa biblioteka")
+        self.setWindowTitle(tr("Nowa biblioteka"))
         self.setMinimumWidth(520)
         self.location = desktop_dir()
         self.result_path: Path | None = None
@@ -26,29 +28,29 @@ class NewLibraryDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(26, 22, 26, 20)
         lay.setSpacing(10)
-        t = QLabel("Nowa biblioteka")
+        t = QLabel(tr("Nowa biblioteka"))
         t.setObjectName("Title")
         lay.addWidget(t)
-        s = QLabel("Biblioteka to folder, w którym będą Twoje posortowane zdjęcia i filmy.")
+        s = QLabel(tr("Biblioteka to folder, w którym będą Twoje posortowane zdjęcia i filmy."))
         s.setObjectName("Muted")
         s.setWordWrap(True)
         lay.addWidget(s)
         lay.addSpacing(4)
-        k = QLabel("Nazwa biblioteki")
+        k = QLabel(tr("Nazwa biblioteki"))
         k.setObjectName("SectionTitle")
         lay.addWidget(k)
         self.name = QLineEdit()
-        self.name.setPlaceholderText("np. Zdjęcia mamy")
+        self.name.setPlaceholderText(tr("np. Zdjęcia mamy"))
         self.name.textChanged.connect(self._update)
         lay.addWidget(self.name)
-        k2 = QLabel("Lokalizacja")
+        k2 = QLabel(tr("Lokalizacja"))
         k2.setObjectName("SectionTitle")
         lay.addWidget(k2)
         row = QHBoxLayout()
         self.loc_label = QLabel()
         self.loc_label.setWordWrap(True)
         row.addWidget(self.loc_label, 1)
-        ch = QPushButton("Zmień…")
+        ch = QPushButton(tr("Zmień…"))
         ch.clicked.connect(self._choose)
         row.addWidget(ch)
         lay.addLayout(row)
@@ -60,15 +62,15 @@ class NewLibraryDialog(QDialog):
         self.err.setObjectName("Error")
         self.err.setWordWrap(True)
         lay.addWidget(self.err)
-        self.open_btn = QPushButton("Otwórz istniejącą bibliotekę")
+        self.open_btn = QPushButton(tr("Otwórz istniejącą bibliotekę"))
         self.open_btn.hide()
         self.open_btn.clicked.connect(self._open_existing)
         lay.addWidget(self.open_btn, 0, Qt.AlignmentFlag.AlignLeft)
         br = QHBoxLayout()
         br.addStretch(1)
-        cancel = QPushButton("Anuluj")
+        cancel = QPushButton(tr("Anuluj"))
         cancel.clicked.connect(self.reject)
-        self.ok = QPushButton("Utwórz bibliotekę")
+        self.ok = QPushButton(tr("Utwórz bibliotekę"))
         self.ok.setObjectName("Primary")
         self.ok.setDefault(True)
         self.ok.clicked.connect(self._create)
@@ -78,7 +80,7 @@ class NewLibraryDialog(QDialog):
         self._update()
 
     def _choose(self) -> None:
-        d = QFileDialog.getExistingDirectory(self, "Gdzie utworzyć bibliotekę?", str(self.location))
+        d = QFileDialog.getExistingDirectory(self, tr("Gdzie utworzyć bibliotekę?"), str(self.location))
         if d:
             self.location = Path(d)
             self._update()
@@ -89,7 +91,7 @@ class NewLibraryDialog(QDialog):
     def _update(self) -> None:
         loc = str(self.location)
         is_desk = os.path.normcase(loc) == os.path.normcase(str(desktop_dir()))
-        self.loc_label.setText(("Pulpit  —  " if is_desk else "") + loc)
+        self.loc_label.setText((tr("Pulpit") + "  —  " if is_desk else "") + loc)
         name = self.name.text().strip()
         self.open_btn.hide()
         if not name:
@@ -101,13 +103,14 @@ class NewLibraryDialog(QDialog):
         target = self._target()
         if msg is None and target.exists():
             if is_library(target):
-                msg = f"Biblioteka „{name}” już istnieje w tej lokalizacji. Możesz ją otworzyć albo wybrać inną nazwę."
+                msg = tr("Biblioteka „{name}” już istnieje w tej lokalizacji. Możesz ją otworzyć albo wybrać "
+                         "inną nazwę.", name=name)
                 self.open_btn.show()
             else:
-                msg = f"Folder „{name}” już istnieje w tej lokalizacji. Wybierz inną nazwę — " \
-                      f"PhotoSort nie nadpisuje istniejących folderów."
+                msg = tr("Folder „{name}” już istnieje w tej lokalizacji. Wybierz inną nazwę — "
+                         "PhotoSort nie nadpisuje istniejących folderów.", name=name)
         self.err.setText(msg or "")
-        self.preview.setText(f"Zostanie utworzony folder:\n{target}" if msg is None else "")
+        self.preview.setText(tr("Zostanie utworzony folder:\n{path}", path=target) if msg is None else "")
         self.ok.setEnabled(msg is None)
 
     def _open_existing(self) -> None:
@@ -195,6 +198,7 @@ class WelcomeScreen(QWidget):
     open_library = Signal()
     open_path = Signal(str)
     remove_recent = Signal(str)
+    language_toggle = Signal(str)   # kod języka, na który przełączyć
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -214,22 +218,24 @@ class WelcomeScreen(QWidget):
         h.setObjectName("H1")
         h.setAlignment(Qt.AlignmentFlag.AlignCenter)
         col.addWidget(h)
-        sub = QLabel("Porządkuj rodzinne zdjęcia i filmy — po prostu przeciągnij je do folderu.")
+        sub = QLabel(tr("Porządkuj rodzinne zdjęcia i filmy — po prostu przeciągnij je do folderu."))
         sub.setObjectName("Muted")
         sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         col.addWidget(sub)
         col.addSpacing(22)
 
-        self.btn_last = self._choice("history", "Otwórz ostatnio używaną bibliotekę", "")
+        self.btn_last = self._choice("history", tr("Otwórz ostatnio używaną bibliotekę"), "")
         self.btn_last.clicked.connect(lambda: self._recent and self.open_path.emit(self._recent[0]))
-        self.btn_new = self._choice("plus", "Utwórz nową bibliotekę", "Nowy folder na Pulpicie (lub w innym miejscu)")
+        self.btn_new = self._choice("plus", tr("Utwórz nową bibliotekę"),
+                                    tr("Nowy folder na Pulpicie (lub w innym miejscu)"))
         self.btn_new.clicked.connect(self.new_library)
-        self.btn_open = self._choice("open", "Otwórz istniejącą bibliotekę", "Wskaż folder biblioteki PhotoSort")
+        self.btn_open = self._choice("open", tr("Otwórz istniejącą bibliotekę"),
+                                     tr("Wskaż folder biblioteki PhotoSort"))
         self.btn_open.clicked.connect(self.open_library)
         for b in (self.btn_last, self.btn_new, self.btn_open):
             col.addWidget(b)
         col.addSpacing(18)
-        self.recent_title = QLabel("OSTATNIE BIBLIOTEKI")
+        self.recent_title = QLabel(tr("OSTATNIE BIBLIOTEKI"))
         self.recent_title.setObjectName("SectionTitle")
         col.addWidget(self.recent_title)
         self.recent_list = QListWidget()
@@ -247,8 +253,15 @@ class WelcomeScreen(QWidget):
         outer.addLayout(center)
         outer.addStretch(3)
         foot = QHBoxLayout()
+        # przełącznik języka — nazwa drugiego języka w jego własnym brzmieniu (bez tłumaczenia)
+        other = "pl" if i18n.language() == "en" else "en"
+        self.lang_btn = QPushButton(i18n.LANGUAGES[other])
+        self.lang_btn.setObjectName("Link")
+        self.lang_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.lang_btn.clicked.connect(lambda: self.language_toggle.emit(other))
+        foot.addWidget(self.lang_btn)
         self.theme_btn = QToolButton()
-        self.theme_btn.setToolTip("Jasny / ciemny motyw")
+        self.theme_btn.setToolTip(tr("Jasny / ciemny motyw"))
         foot.addStretch(1)
         foot.addWidget(self.theme_btn)
         outer.addLayout(foot)
@@ -279,8 +292,8 @@ class WelcomeScreen(QWidget):
         has = bool(self._recent)
         self.btn_last.setVisible(has)
         if has:
-            self._set_choice_text(self.btn_last, f"Otwórz „{Path(self._recent[0]).name}”",
-                                  "Kontynuuj dokładnie tam, gdzie skończyłeś")
+            self._set_choice_text(self.btn_last, tr("Otwórz „{name}”", name=Path(self._recent[0]).name),
+                                  tr("Kontynuuj dokładnie tam, gdzie skończyłeś"))
         self.recent_title.setVisible(len(self._recent) > 1)
         self.recent_list.setVisible(len(self._recent) > 1)
 
@@ -289,6 +302,6 @@ class WelcomeScreen(QWidget):
         if not it:
             return
         m = QMenu(self)
-        m.addAction("Usuń z listy (pliki pozostaną na dysku)").triggered.connect(
+        m.addAction(tr("Usuń z listy (pliki pozostaną na dysku)")).triggered.connect(
             lambda: self.remove_recent.emit(it.data(Qt.ItemDataRole.UserRole)))
         m.exec(self.recent_list.viewport().mapToGlobal(pos))

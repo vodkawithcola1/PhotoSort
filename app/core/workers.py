@@ -9,6 +9,7 @@ from PySide6.QtCore import QThread, Signal
 
 from app.core.import_manager import Importer, ImportStats, collect_media_files
 from app.core.library_manager import Library
+from app.i18n import tr
 from app.services.geocode_service import Geocoder
 from app.services.metadata_service import MediaMeta, MetadataReader
 
@@ -188,7 +189,7 @@ class ImportWorker(QThread):
                 importer.progress = lambda s, name: self._emit(s, "copy", name)
                 importer.import_paths(files, self.label, limit=self.limit)
         except Exception as exc:
-            stats.errors.append(f"Nieoczekiwany błąd importu: {exc}")
+            stats.errors.append(tr("Nieoczekiwany błąd importu: {error}", error=exc))
         finally:
             self._emit(stats, "done", force=True)
             db.close()

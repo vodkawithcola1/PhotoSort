@@ -1,13 +1,14 @@
 """Kolejka multimediów: wirtualizowany pasek / siatka miniatur z przeciąganiem."""
 from __future__ import annotations
 
-from PySide6.QtCore import (QAbstractListModel, QItemSelectionModel, QModelIndex, QPoint, QRect, QRectF,
+from PySide6.QtCore import (QAbstractListModel, QItemSelectionModel, QModelIndex, QPoint, QRectF,
                             QSize, Qt, Signal)
 from PySide6.QtGui import QAction, QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QListView, QMenu, QStyle,
                                QStyledItemDelegate, QStyleOptionViewItem)
 
 from app.core.library_controller import LibraryController
+from app.i18n import display_folder, tr
 from app.services.thumbnail_service import ThumbnailService
 from app.ui import icons, theme
 from app.ui.drag import start_media_drag
@@ -94,12 +95,12 @@ class ThumbDelegate(QStyledItemDelegate):
         pm = ctrl.device_thumb(mid) if mid < 0 else thumbs.get(mid)
         if pm is not None and not pm.isNull():
             sw, sh = pm.width(), pm.height()
-            tr = r.width() / r.height()
-            if sw / sh > tr:
-                nw = sh * tr
+            ratio = r.width() / r.height()
+            if sw / sh > ratio:
+                nw = sh * ratio
                 src = QRectF((sw - nw) / 2, 0, nw, sh)
             else:
-                nh = sw / tr
+                nh = sw / ratio
                 src = QRectF(0, (sh - nh) / 2, sw, nh)
             p.drawPixmap(r, pm, src)
         else:
@@ -291,29 +292,29 @@ class ThumbnailView(QListView):
         m = QMenu(self)
         from_device = mid < 0
         if from_device:
-            title = "Skopiuj z telefonu do" if len(ids) == 1 else "Skopiuj zaznaczone z telefonu do"
+            title = tr("Skopiuj z telefonu do") if len(ids) == 1 else tr("Skopiuj zaznaczone z telefonu do")
         else:
-            title = "Przenieś zaznaczone do" if len(ids) > 1 else "Przenieś do"
+            title = tr("Przenieś zaznaczone do") if len(ids) > 1 else tr("Przenieś do")
         sub = m.addMenu(icons.icon("folder"), title)
         folders = self.folders_provider() if self.folders_provider else []
         for name in folders:
             if self.ctrl.scope.lower() == name.lower():
                 continue
-            act = QAction(name, sub)
+            act = QAction(display_folder(name), sub)
             act.triggered.connect(lambda _=False, n=name, i=list(ids): self.move_to_folder and self.move_to_folder(i, n))
             sub.addAction(act)
         if not folders:
             sub.setEnabled(False)
         if from_device:
             m.addSeparator()
-            sa = m.addAction("Zaznacz wszystko")
+            sa = m.addAction(tr("Zaznacz wszystko"))
             sa.triggered.connect(self.selectAll)
             m.exec(self.viewport().mapToGlobal(pos))
             return
         m.addSeparator()
-        bm = m.addAction(icons.icon("bookmark"), "Dodaj / usuń zakładkę")
+        bm = m.addAction(icons.icon("bookmark"), tr("Dodaj / usuń zakładkę"))
         bm.triggered.connect(lambda: self.ctrl.toggle_bookmark(mid))
-        reveal = m.addAction(icons.icon("open"), "Pokaż w Eksploratorze")
+        reveal = m.addAction(icons.icon("open"), tr("Pokaż w Eksploratorze"))
 
         def _reveal():
             from app.utils.paths import reveal_in_explorer
@@ -322,6 +323,6 @@ class ThumbnailView(QListView):
                 reveal_in_explorer(self.ctrl.lib.abs_path(row[4]))
         reveal.triggered.connect(_reveal)
         m.addSeparator()
-        sa = m.addAction("Zaznacz wszystko")
+        sa = m.addAction(tr("Zaznacz wszystko"))
         sa.triggered.connect(self.selectAll)
         m.exec(self.viewport().mapToGlobal(pos))

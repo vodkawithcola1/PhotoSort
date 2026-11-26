@@ -23,6 +23,7 @@ from typing import Callable, Iterable
 from app.constants import DISK_SPACE_MARGIN, PARTIAL_SUFFIX, UNSORTED_FOLDER, media_kind
 from app.core.library_manager import Library, rel_of
 from app.database.database import Database
+from app.i18n import tr
 from app.utils.paths import copy_creation_time, file_creation_time, is_hidden_name, unique_path
 
 CHUNK = 4 * 1024 * 1024
@@ -133,7 +134,7 @@ class Importer:
                     self.stats.limit_reached = True
                     break
                 if self.is_cancelled():
-                    self.stats.aborted_reason = "Import przerwany przez użytkownika."
+                    self.stats.aborted_reason = tr("Import przerwany przez użytkownika.")
                     break
                 self.progress(self.stats, src.name)
                 try:
@@ -159,7 +160,7 @@ class Importer:
         st = src.stat()
         kind = media_kind(src.suffix)
         if kind is None:
-            raise ValueError("nieobsługiwany format")
+            raise ValueError(tr("nieobsługiwany format"))
         if source_key is None:
             source_key = f"{os.path.normcase(str(src.resolve()))}|{st.st_size}|{int(st.st_mtime)}"
         # 1) ten sam plik już kiedyś zaimportowany i nadal jest w bibliotece
@@ -175,8 +176,8 @@ class Importer:
         # 2) miejsce na dysku
         free = shutil.disk_usage(self.dest_dir).free
         if free < st.st_size + DISK_SPACE_MARGIN:
-            raise DiskFullError("Brak miejsca na dysku — import został zatrzymany. "
-                                "Zwolnij miejsce i uruchom import ponownie.")
+            raise DiskFullError(tr("Brak miejsca na dysku — import został zatrzymany. "
+                                   "Zwolnij miejsce i uruchom import ponownie."))
 
         # 3) kopiowanie do pliku tymczasowego z jednoczesnym liczeniem skrótu
         partial = unique_path(self.dest_dir, src.name + PARTIAL_SUFFIX)
@@ -194,14 +195,14 @@ class Importer:
                 fout.flush()
                 os.fsync(fout.fileno())
             if os.path.getsize(partial) != st.st_size:
-                raise OSError("rozmiar kopii nie zgadza się z oryginałem")
+                raise OSError(tr("rozmiar kopii nie zgadza się z oryginałem"))
         except ImportCancelled:
             _remove_quiet(partial)
             raise
         except OSError as exc:
             _remove_quiet(partial)
             if _is_disk_full(exc):
-                raise DiskFullError("Brak miejsca na dysku — import został zatrzymany.") from exc
+                raise DiskFullError(tr("Brak miejsca na dysku — import został zatrzymany.")) from exc
             raise
         digest = h.hexdigest()
 
@@ -254,7 +255,7 @@ class Importer:
                 return final
             except FileExistsError:
                 continue
-        raise OSError("nie udało się nadać unikalnej nazwy pliku")
+        raise OSError(tr("nie udało się nadać unikalnej nazwy pliku"))
 
     def _existing(self, rows) -> bool:
         """Czy któryś z wpisów indeksu ma plik faktycznie obecny na dysku (usuwa nieaktualne)."""
@@ -296,7 +297,7 @@ class Importer:
         st = final.stat()
         rel = rel_of(self.dest_folder, final.name)
         mod_iso = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime))
-        cur = self.db.execute(
+        self.db.execute(
             "INSERT INTO media(rel_path, folder, filename, kind, ext, size, file_created, file_modified, "
             "imported_at, source_path, hash, sort_date, meta_status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0) "
             "ON CONFLICT(rel_path) DO UPDATE SET size=excluded.size, hash=excluded.hash, "
@@ -321,9 +322,9 @@ def _is_disk_full(exc: OSError) -> bool:
 
 def _err_text(exc: Exception) -> str:
     if isinstance(exc, PermissionError):
-        return "brak dostępu do pliku (może być używany przez inny program)"
+        return tr("brak dostępu do pliku (może być używany przez inny program)")
     if isinstance(exc, FileNotFoundError):
-        return "plik nie istnieje lub urządzenie zostało odłączone"
+        return tr("plik nie istnieje lub urządzenie zostało odłączone")
     if isinstance(exc, OSError):
         return exc.strerror or str(exc)
     return str(exc)

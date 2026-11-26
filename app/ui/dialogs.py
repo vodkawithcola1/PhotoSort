@@ -5,12 +5,13 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
                                QVBoxLayout, QWidget)
 
+from app.i18n import tr
 from app.utils.paths import validate_folder_name
 
 
 class TextPrompt(QDialog):
     def __init__(self, parent: QWidget | None, title: str, label: str, text: str = "",
-                 ok_text: str = "Zapisz", validate_name: bool = True):
+                 ok_text: str | None = None, validate_name: bool = True):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setMinimumWidth(400)
@@ -35,9 +36,9 @@ class TextPrompt(QDialog):
         lay.addWidget(self.err)
         row = QHBoxLayout()
         row.addStretch(1)
-        cancel = QPushButton("Anuluj")
+        cancel = QPushButton(tr("Anuluj"))
         cancel.clicked.connect(self.reject)
-        self.ok = QPushButton(ok_text)
+        self.ok = QPushButton(ok_text or tr("Zapisz"))
         self.ok.setObjectName("Primary")
         self.ok.setDefault(True)
         self.ok.clicked.connect(self.accept)
@@ -59,7 +60,7 @@ class TextPrompt(QDialog):
         return self.edit.text().strip()
 
     @staticmethod
-    def ask(parent, title: str, label: str, text: str = "", ok_text: str = "Zapisz") -> str | None:
+    def ask(parent, title: str, label: str, text: str = "", ok_text: str | None = None) -> str | None:
         d = TextPrompt(parent, title, label, text, ok_text)
         if d.exec() == QDialog.DialogCode.Accepted:
             return d.value()
@@ -82,13 +83,13 @@ def warn(parent, title: str, text: str) -> None:
     box.exec()
 
 
-def confirm(parent, title: str, text: str, yes: str = "Tak", no: str = "Anuluj") -> bool:
+def confirm(parent, title: str, text: str, yes: str | None = None, no: str | None = None) -> bool:
     box = QMessageBox(parent)
     box.setWindowTitle(title)
     box.setIcon(QMessageBox.Icon.Question)
     box.setText(text)
-    y = box.addButton(yes, QMessageBox.ButtonRole.AcceptRole)
-    box.addButton(no, QMessageBox.ButtonRole.RejectRole)
+    y = box.addButton(yes or tr("Tak"), QMessageBox.ButtonRole.AcceptRole)
+    box.addButton(no or tr("Anuluj"), QMessageBox.ButtonRole.RejectRole)
     box.exec()
     return box.clickedButton() is y
 

@@ -28,6 +28,7 @@ from PySide6.QtGui import QImage
 from app.constants import DISK_SPACE_MARGIN, media_kind
 from app.core.import_manager import Importer
 from app.core.library_manager import Library
+from app.i18n import tr
 from app.services import device_service as ds
 
 _log = logging.getLogger("photosort.device")
@@ -157,7 +158,7 @@ class DeviceBrowser(QObject):
     # ------------------------------------------------------------------ #
     def _run(self) -> None:
         if not ds.available():
-            self.scan_failed.emit("Obsługa urządzeń przenośnych jest niedostępna w tym systemie.")
+            self.scan_failed.emit(tr("Obsługa urządzeń przenośnych jest niedostępna w tym systemie."))
             return
         db = self.lib.open_db()
         try:
@@ -173,7 +174,7 @@ class DeviceBrowser(QObject):
                         continue
                     self._handle(*job)
         except Exception as exc:
-            self.scan_failed.emit(f"Błąd połączenia z urządzeniem: {exc}")
+            self.scan_failed.emit(tr("Błąd połączenia z urządzeniem: {error}", error=exc))
         finally:
             db.close()
 
@@ -194,7 +195,7 @@ class DeviceBrowser(QObject):
             if kind == "import":
                 self.imported.emit(payload[0], None, "error", str(exc))
             elif kind == "more":
-                self.scan_failed.emit(f"Błąd odczytu telefonu: {exc}")
+                self.scan_failed.emit(tr("Błąd odczytu telefonu: {error}", error=exc))
             elif kind == "fetch":
                 self.fetch_failed.emit(payload, str(exc))
             else:
@@ -300,8 +301,8 @@ class DeviceBrowser(QObject):
         if batch:
             self.entries_added.emit(batch)
         if exhausted and not self._any_media:
-            self.scan_failed.emit("Nie znaleziono zdjęć ani filmów we wskazanych folderach telefonu. "
-                                  "Odblokuj telefon i sprawdź, czy zezwolono na dostęp do plików.")
+            self.scan_failed.emit(tr("Nie znaleziono zdjęć ani filmów we wskazanych folderach telefonu. "
+                                     "Odblokuj telefon i sprawdź, czy zezwolono na dostęp do plików."))
             return
         self.scan_finished.emit(exhausted)
 
@@ -351,8 +352,8 @@ class DeviceBrowser(QObject):
         path = self._copy_to_cache(shell, idx, lambda pct: self.fetch_progress.emit(idx, pct))
         if path is None:
             if not self._stop.is_set() and self._check_presence(shell):
-                self.fetch_failed.emit(idx, "Nie udało się skopiować pliku z telefonu "
-                                            "(telefon zablokowany lub odłączony?).")
+                self.fetch_failed.emit(idx, tr("Nie udało się skopiować pliku z telefonu "
+                                               "(telefon zablokowany lub odłączony?)."))
             return
         self.fetch_progress.emit(idx, 100)
         self.fetched.emit(idx, str(path))
@@ -376,7 +377,7 @@ class DeviceBrowser(QObject):
             return None
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         if shutil.disk_usage(self.cache_dir).free < e.size + DISK_SPACE_MARGIN:
-            raise OSError("Brak miejsca na dysku.")
+            raise OSError(tr("Brak miejsca na dysku."))
         slot = self.cache_dir / f"{idx:06d}"
         shutil.rmtree(slot, ignore_errors=True)
         if slot.exists():      # stara kopia zablokowana (np. otwarta w odtwarzaczu) — nowy slot
@@ -417,7 +418,7 @@ class DeviceBrowser(QObject):
     def _do_import(self, shell, db, idx: int, folder: str) -> None:
         e = self.entries.get(idx)
         if e is None:
-            self.imported.emit(idx, None, "error", "Nieznany plik.")
+            self.imported.emit(idx, None, "error", tr("Nieznany plik."))
             return
         path = self._copy_to_cache(shell, idx)
         if path is None:
@@ -425,7 +426,8 @@ class DeviceBrowser(QObject):
                 return
             self._check_presence(shell)
             self.imported.emit(idx, None, "error",
-                               f"{e.name}: nie udało się skopiować z telefonu (telefon zablokowany lub odłączony?)")
+                               tr("{name}: nie udało się skopiować z telefonu (telefon zablokowany lub odłączony?)",
+                                  name=e.name))
             return
         with self._lock:
             self._cache.pop(idx, None)     # plik zostanie „skonsumowany” przez import

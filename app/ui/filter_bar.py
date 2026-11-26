@@ -8,11 +8,12 @@ from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox, QDateEdit, QD
                                QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QToolButton,
                                QVBoxLayout, QWidget)
 
-from app.constants import SCOPE_ALL, SCOPE_DEVICE, UNSORTED_FOLDER
+from app.constants import SCOPE_ALL, SCOPE_DEVICE
 from app.core.library_controller import LibraryController
 from app.core.media_manager import Filters
+from app.i18n import display_folder, tr
 from app.ui import icons, theme
-from app.utils.formatting import MONTHS_PL, count_pl, date_pl, parse_iso
+from app.utils.formatting import count_pl, date_pl, month_names, parse_iso
 
 SORT_OPTIONS = [("date", "Data wykonania"), ("name", "Nazwa pliku"), ("imported", "Data importu"),
                 ("size", "Rozmiar pliku")]
@@ -29,7 +30,7 @@ class FiltersPopup(QFrame):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 16, 18, 14)
         lay.setSpacing(10)
-        t = QLabel("Filtry")
+        t = QLabel(tr("Filtry"))
         t.setObjectName("H2")
         lay.addWidget(t)
         g = QGridLayout()
@@ -37,18 +38,18 @@ class FiltersPopup(QFrame):
         g.setVerticalSpacing(8)
         r = 0
 
-        g.addWidget(self._k("Rok"), r, 0)
+        g.addWidget(self._k(tr("Rok")), r, 0)
         self.year = QComboBox()
         g.addWidget(self.year, r, 1)
-        g.addWidget(self._k("Miesiąc"), r, 2)
+        g.addWidget(self._k(tr("Miesiąc")), r, 2)
         self.month = QComboBox()
-        self.month.addItem("Dowolny", 0)
-        for i, m in enumerate(MONTHS_PL, 1):
+        self.month.addItem(tr("Dowolny"), 0)
+        for i, m in enumerate(month_names(), 1):
             self.month.addItem(m.capitalize(), i)
         g.addWidget(self.month, r, 3)
         r += 1
 
-        self.use_range = QCheckBox("Zakres dat")
+        self.use_range = QCheckBox(tr("Zakres dat"))
         g.addWidget(self.use_range, r, 0)
         self.d_from = QDateEdit()
         self.d_to = QDateEdit()
@@ -58,11 +59,11 @@ class FiltersPopup(QFrame):
             d.setDate(QDate.currentDate())
         self.use_range.toggled.connect(lambda on: (self.d_from.setEnabled(on), self.d_to.setEnabled(on)))
         g.addWidget(self.d_from, r, 1)
-        g.addWidget(self._k("do"), r, 2)
+        g.addWidget(self._k(tr("do")), r, 2)
         g.addWidget(self.d_to, r, 3)
         r += 1
 
-        g.addWidget(self._k("Rozmiar od (MB)"), r, 0)
+        g.addWidget(self._k(tr("Rozmiar od (MB)")), r, 0)
         self.min_size = QDoubleSpinBox()
         self.max_size = QDoubleSpinBox()
         for s in (self.min_size, self.max_size):
@@ -70,33 +71,33 @@ class FiltersPopup(QFrame):
             s.setDecimals(1)
             s.setSpecialValueText("—")
         g.addWidget(self.min_size, r, 1)
-        g.addWidget(self._k("do (MB)"), r, 2)
+        g.addWidget(self._k(tr("do (MB)")), r, 2)
         g.addWidget(self.max_size, r, 3)
         r += 1
 
-        self.loc_label = self._k("Lokalizacja")
+        self.loc_label = self._k(tr("Lokalizacja"))
         g.addWidget(self.loc_label, r, 0)
         self.loc_mode = QComboBox()
-        self.loc_mode.addItem("Dowolna", "")
-        self.loc_mode.addItem("Tylko z lokalizacją GPS", "__gps__")
-        self.loc_mode.addItem("Bez lokalizacji", "__nogps__")
-        self.loc_mode.addItem("Miejscowość…", "__text__")
+        self.loc_mode.addItem(tr("Dowolna"), "")
+        self.loc_mode.addItem(tr("Tylko z lokalizacją GPS"), "__gps__")
+        self.loc_mode.addItem(tr("Bez lokalizacji"), "__nogps__")
+        self.loc_mode.addItem(tr("Miejscowość…"), "__text__")
         g.addWidget(self.loc_mode, r, 1)
         self.loc_text = QLineEdit()
-        self.loc_text.setPlaceholderText("np. Kraków")
+        self.loc_text.setPlaceholderText(tr("np. Kraków"))
         g.addWidget(self.loc_text, r, 2, 1, 2)
         self.loc_mode.currentIndexChanged.connect(
             lambda: self.loc_text.setEnabled(self.loc_mode.currentData() == "__text__"))
         r += 1
 
-        self.status_label = self._k("Status")
+        self.status_label = self._k(tr("Status"))
         g.addWidget(self.status_label, r, 0)
         self.status = QComboBox()
-        self.status.addItem("Wszystkie", "all")
-        self.status.addItem("Posortowane", "sorted")
-        self.status.addItem("Nieposortowane", "unsorted")
+        self.status.addItem(tr("Wszystkie"), "all")
+        self.status.addItem(tr("Posortowane"), "sorted")
+        self.status.addItem(tr("Nieposortowane"), "unsorted")
         g.addWidget(self.status, r, 1)
-        self.folder_label = self._k("Folder")
+        self.folder_label = self._k(tr("Folder"))
         g.addWidget(self.folder_label, r, 2)
         self.folder = QComboBox()
         g.addWidget(self.folder, r, 3)
@@ -104,11 +105,11 @@ class FiltersPopup(QFrame):
         lay.addLayout(g)
 
         row = QHBoxLayout()
-        clear = QPushButton("Wyczyść filtry")
+        clear = QPushButton(tr("Wyczyść filtry"))
         clear.clicked.connect(self._clear)
         row.addWidget(clear)
         row.addStretch(1)
-        ok = QPushButton("Zastosuj")
+        ok = QPushButton(tr("Zastosuj"))
         ok.setObjectName("Primary")
         ok.clicked.connect(self._apply)
         row.addWidget(ok)
@@ -122,7 +123,7 @@ class FiltersPopup(QFrame):
     def load(self, f: Filters) -> None:
         device = self.ctrl.scope == SCOPE_DEVICE
         self.year.clear()
-        self.year.addItem("Dowolny", 0)
+        self.year.addItem(tr("Dowolny"), 0)
         if device:
             years = sorted({int(e.date[:4]) for e in self.ctrl.device_entries.values() if e.date[:4].isdigit()},
                            reverse=True)
@@ -155,9 +156,9 @@ class FiltersPopup(QFrame):
             w.setVisible(all_scope)
         self.status.setCurrentIndex(max(0, self.status.findData(f.status)))
         self.folder.clear()
-        self.folder.addItem("Dowolny", "")
+        self.folder.addItem(tr("Dowolny"), "")
         for name in self.ctrl.lib.folder_dirs():
-            self.folder.addItem(name, name)
+            self.folder.addItem(display_folder(name), name)
         self.folder.setCurrentIndex(max(0, self.folder.findData(f.folder)))
         self._base = f
 
@@ -223,7 +224,7 @@ class QueueHeader(QWidget):
 
         self.search = QLineEdit()
         self.search.setObjectName("Search")
-        self.search.setPlaceholderText("Szukaj po nazwie pliku")
+        self.search.setPlaceholderText(tr("Szukaj po nazwie pliku"))
         self.search.setClearButtonEnabled(True)
         self.search.setFixedWidth(210)
         self.search_icon = QLabel(self.search)
@@ -238,7 +239,7 @@ class QueueHeader(QWidget):
 
         self.kind_group = QButtonGroup(self)
         self.kind_btns = {}
-        for key, text in (("all", "Wszystko"), ("photo", "Zdjęcia"), ("video", "Filmy")):
+        for key, text in (("all", tr("Wszystko")), ("photo", tr("Zdjęcia")), ("video", tr("Filmy"))):
             b = QToolButton()
             b.setText(text)
             b.setObjectName("Pill")
@@ -251,8 +252,8 @@ class QueueHeader(QWidget):
 
         self.sort = QComboBox()
         for key, text in SORT_OPTIONS:
-            self.sort.addItem(text, key)
-        self.sort.setToolTip("Sortowanie")
+            self.sort.addItem(tr(text), key)  # i18n: ignore
+        self.sort.setToolTip(tr("Sortowanie"))
         self.sort.activated.connect(self._sort_changed)
         lay.addWidget(self.sort)
         self.order = QToolButton()
@@ -261,22 +262,22 @@ class QueueHeader(QWidget):
 
         self.same_day = QToolButton()
         self.same_day.setObjectName("Pill")
-        self.same_day.setText("Ten sam dzień")
+        self.same_day.setText(tr("Ten sam dzień"))
         self.same_day.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.same_day.setCheckable(True)
-        self.same_day.setToolTip("Pokaż wszystkie zdjęcia i filmy z dnia, w którym wykonano bieżący plik")
+        self.same_day.setToolTip(tr("Pokaż wszystkie zdjęcia i filmy z dnia, w którym wykonano bieżący plik"))
         self.same_day.clicked.connect(self._toggle_same_day)
         lay.addWidget(self.same_day)
 
         self.filters_btn = QToolButton()
         self.filters_btn.setObjectName("Pill")
         self.filters_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.filters_btn.setText("Filtry")
+        self.filters_btn.setText(tr("Filtry"))
         self.filters_btn.clicked.connect(self._open_filters)
         lay.addWidget(self.filters_btn)
 
         self.expand_btn = QToolButton()
-        self.expand_btn.setToolTip("Rozwiń / zwiń siatkę miniatur")
+        self.expand_btn.setToolTip(tr("Rozwiń / zwiń siatkę miniatur"))
         self.expand_btn.clicked.connect(self.toggle_expand)
         lay.addWidget(self.expand_btn)
 
@@ -288,7 +289,7 @@ class QueueHeader(QWidget):
         self.chips_text = QLabel()
         self.chips_text.setObjectName("FilterChip")
         cl.addWidget(self.chips_text)
-        clear = QPushButton("Wyczyść filtry")
+        clear = QPushButton(tr("Wyczyść filtry"))
         clear.setObjectName("Link")
         clear.setCursor(Qt.CursorShape.PointingHandCursor)
         clear.clicked.connect(lambda: self.ctrl.set_filters(Filters()))
@@ -312,7 +313,8 @@ class QueueHeader(QWidget):
         self.filters_btn.setIcon(icons.icon("filter", c["text2"], 16))
         self.expand_btn.setIcon(icons.icon("chevron_down" if self.expanded else "chevron_up", c["text"], 20))
         self.order.setIcon(icons.icon("chevron_up" if self.ctrl.state.ascending else "chevron_down", c["text2"], 16))
-        self.order.setToolTip("Rosnąco (od najstarszych)" if self.ctrl.state.ascending else "Malejąco (od najnowszych)")
+        self.order.setToolTip(tr("Rosnąco (od najstarszych)") if self.ctrl.state.ascending
+                               else tr("Malejąco (od najnowszych)"))
 
     def set_compact(self, level: int) -> None:
         """0 = pełny, 1 = węższy, 2 = wąski (sortowanie i filtry w drugim wierszu)."""
@@ -340,15 +342,15 @@ class QueueHeader(QWidget):
         scope = ctrl.scope
         device = scope == SCOPE_DEVICE
         if device:
-            self.title.setText("Telefon")   # pełna nazwa urządzenia jest w nawigacji u góry
+            self.title.setText(tr("Telefon"))   # pełna nazwa urządzenia jest w nawigacji u góry
             self.title.setToolTip(ctrl.device_name)
         else:
-            self.title.setText("Wszystkie multimedia" if scope == SCOPE_ALL else scope)
+            self.title.setText(tr("Wszystkie multimedia") if scope == SCOPE_ALL else display_folder(scope))
         self.update_position()
         # w trybie telefonu: lista od najnowszych, bez filtrów dat/lokalizacji (metadane nieznane przed kopiowaniem)
         for w in (self.sort, self.order):
             w.setEnabled(not device)
-        self.sort.setToolTip("Zdjęcia z telefonu są ułożone od najnowszych" if device else "Sortowanie")
+        self.sort.setToolTip(tr("Zdjęcia z telefonu są ułożone od najnowszych") if device else tr("Sortowanie"))
         f = ctrl.filters
         for k, b in self.kind_btns.items():
             b.setChecked(f.kind == k)
@@ -359,7 +361,7 @@ class QueueHeader(QWidget):
         self.sort.setCurrentIndex(max(0, self.sort.findData(ctrl.state.sort)))
         self.same_day.setChecked(bool(f.same_day))
         n_adv = f.active_count() - (1 if f.kind != "all" else 0) - (1 if f.same_day else 0)
-        self.filters_btn.setText(f"Filtry ({n_adv})" if n_adv else "Filtry")
+        self.filters_btn.setText(tr("Filtry ({n})", n=n_adv) if n_adv else tr("Filtry"))
         self.filters_btn.setChecked(bool(n_adv))
         self.filters_btn.setCheckable(True)
         desc = describe_filters(f)
@@ -370,21 +372,28 @@ class QueueHeader(QWidget):
     def update_position(self) -> None:
         ctrl = self.ctrl
         n = len(ctrl.ids)
-        pos = f"{ctrl.index + 1} z " if ctrl.index >= 0 else ""
         suffix = ""
         if ctrl.scope == SCOPE_DEVICE:
-            suffix = " na telefonie"
+            suffix = tr(" na telefonie")
             if ctrl.device_status == "scanning":
                 if ctrl.device_limit:
-                    suffix += f" · wczytywanie {min(ctrl.device_found, ctrl.device_limit)}/{ctrl.device_limit}…"
+                    suffix += tr(" · wczytywanie {found}/{limit}…",
+                                 found=min(ctrl.device_found, ctrl.device_limit), limit=ctrl.device_limit)
                 else:
-                    suffix += " · wczytywanie…"
+                    suffix += tr(" · wczytywanie…")
             elif ctrl.device_more:
-                suffix += " (są kolejne)"
+                suffix += tr(" (są kolejne)")
             if not n:
-                self.count.setText("wczytywanie…" if ctrl.device_status == "scanning" else "brak nowych plików")
+                self.count.setText(tr("wczytywanie…") if ctrl.device_status == "scanning" else tr("brak nowych plików"))
                 return
-        self.count.setText(f"{pos}{count_pl(n, 'plik', 'pliki', 'plików')}{suffix}" if n else "brak plików")
+        if not n:
+            self.count.setText(tr("brak plików"))
+            return
+        files = count_pl(n, 'plik', 'pliki', 'plików')
+        if ctrl.index >= 0:
+            self.count.setText(tr("{pos} z {files}{suffix}", pos=ctrl.index + 1, files=files, suffix=suffix))
+        else:
+            self.count.setText(f"{files}{suffix}")
 
     def _apply_search(self) -> None:
         f = replace(self.ctrl.filters, text=self.search.text())
@@ -432,14 +441,15 @@ class QueueHeader(QWidget):
 
 def describe_filters(f: Filters) -> list[str]:
     out = []
+    months = month_names()
     if f.same_day:
-        out.append(f"z dnia {date_pl(parse_iso(f.same_day + ' 00:00:00'))}")
+        out.append(tr("z dnia {date}", date=date_pl(parse_iso(f.same_day + " 00:00:00"))))
     if f.year and f.month:
-        out.append(f"{MONTHS_PL[f.month - 1]} {f.year}")
+        out.append(f"{months[f.month - 1]} {f.year}")
     elif f.year:
-        out.append(f"rok {f.year}")
+        out.append(tr("rok {year}", year=f.year))
     elif f.month:
-        out.append(f"{MONTHS_PL[f.month - 1]} (każdy rok)")
+        out.append(tr("{month} (każdy rok)", month=months[f.month - 1]))
     if f.date_from or f.date_to:
         a = date_pl(parse_iso(f.date_from + " 00:00:00")) if f.date_from else "…"
         b = date_pl(parse_iso(f.date_to + " 00:00:00")) if f.date_to else "…"
@@ -447,23 +457,23 @@ def describe_filters(f: Filters) -> list[str]:
     if f.min_size_mb or f.max_size_mb:
         a = f"{f.min_size_mb:g}" if f.min_size_mb else "0"
         b = f"{f.max_size_mb:g}" if f.max_size_mb else "∞"
-        out.append(f"rozmiar {a}–{b} MB")
+        out.append(tr("rozmiar {low}–{high} MB", low=a, high=b))
     if f.location == "__gps__":
-        out.append("z lokalizacją GPS")
+        out.append(tr("z lokalizacją GPS"))
     elif f.location == "__nogps__":
-        out.append("bez lokalizacji")
+        out.append(tr("bez lokalizacji"))
     elif f.location:
-        out.append(f"miejsce: {f.location}")
+        out.append(tr("miejsce: {place}", place=f.location))
     if f.status == "sorted":
-        out.append("posortowane")
+        out.append(tr("posortowane"))
     elif f.status == "unsorted":
-        out.append("nieposortowane")
+        out.append(tr("nieposortowane"))
     if f.folder:
-        out.append(f"folder: {f.folder}")
+        out.append(tr("folder: {folder}", folder=display_folder(f.folder)))
     if f.kind == "photo":
-        out.append("tylko zdjęcia")
+        out.append(tr("tylko zdjęcia"))
     elif f.kind == "video":
-        out.append("tylko filmy")
+        out.append(tr("tylko filmy"))
     if f.text:
-        out.append(f"nazwa zawiera „{f.text}”")
+        out.append(tr("nazwa zawiera „{text}”", text=f.text))
     return out

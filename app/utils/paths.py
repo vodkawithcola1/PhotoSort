@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from app.constants import INVALID_NAME_CHARS, RESERVED_NAMES
+from app.i18n import tr
 
 
 def desktop_dir() -> Path:
@@ -49,19 +50,19 @@ def validate_folder_name(name: str) -> str | None:
     """Zwraca komunikat błędu albo None, gdy nazwa jest poprawna."""
     stripped = name.strip()
     if not stripped:
-        return "Nazwa nie może być pusta."
+        return tr("Nazwa nie może być pusta.")
     if any(ch in INVALID_NAME_CHARS for ch in stripped):
-        return 'Nazwa nie może zawierać znaków: < > : " / \\ | ? *'
+        return tr('Nazwa nie może zawierać znaków: < > : " / \\ | ? *')
     if stripped.endswith("."):
-        return "Nazwa nie może kończyć się kropką."
+        return tr("Nazwa nie może kończyć się kropką.")
     if stripped.startswith("."):
-        return "Nazwa nie może zaczynać się od kropki."
+        return tr("Nazwa nie może zaczynać się od kropki.")
     if stripped.split(".")[0].upper() in RESERVED_NAMES:
-        return "Ta nazwa jest zarezerwowana przez system Windows."
+        return tr("Ta nazwa jest zarezerwowana przez system Windows.")
     if len(stripped) > 120:
-        return "Nazwa jest zbyt długa."
+        return tr("Nazwa jest zbyt długa.")
     if any(ord(ch) < 32 for ch in stripped):
-        return "Nazwa zawiera niedozwolone znaki."
+        return tr("Nazwa zawiera niedozwolone znaki.")
     return None
 
 
@@ -103,7 +104,7 @@ def copy_creation_time(src: Path, dst: Path) -> None:
         import ctypes
         from ctypes import wintypes
         kernel32 = ctypes.windll.kernel32
-        GENERIC_READ, GENERIC_WRITE = 0x80000000, 0x40000000
+        GENERIC_READ = 0x80000000
         FILE_WRITE_ATTRIBUTES = 0x100
         OPEN_EXISTING = 3
         SHARE = 0x1 | 0x2 | 0x4

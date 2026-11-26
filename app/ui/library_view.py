@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QComboBox, QFrame
 
 from app.constants import SCOPE_ALL, SCOPE_DEVICE, UNSORTED_FOLDER
 from app.core.library_controller import LibraryController
+from app.i18n import display_folder, is_english, tr
 from app.services.thumbnail_service import ThumbnailService
 from app.ui import icons, theme
 from app.ui.drag import start_media_drag
@@ -33,7 +34,7 @@ class Toast(QFrame):
         lay.setSpacing(10)
         self.icon = QLabel()
         self.text = QLabel()
-        self.undo = QPushButton("Cofnij")
+        self.undo = QPushButton(tr("Cofnij"))
         self.undo.setObjectName("Link")
         self.undo.setCursor(Qt.CursorShape.PointingHandCursor)
         self.undo.clicked.connect(self.undo_clicked)
@@ -88,7 +89,7 @@ class SortProgress(QToolButton):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setToolTip("Postęp sortowania — kliknij, aby zobaczyć statystyki")
+        self.setToolTip(tr("Postęp sortowania — kliknij, aby zobaczyć statystyki"))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(10, 5, 10, 5)
@@ -115,11 +116,14 @@ class SortProgress(QToolButton):
     def set_stats(self, s: dict) -> None:
         self.stats = s
         pct = s["percent"]
-        txt = f"{pct:.0f}% posortowano" if s["total"] else "Brak plików"
+        pct_txt = f"{pct:.0f}%"
+        left = format_int(s["unsorted"])
+        txt = tr("{percent} posortowano", percent=pct_txt) if s["total"] else tr("Brak plików")
         if s["total"] and not getattr(self, "_compact", False):
-            txt += f"  ·  zostało {format_int(s['unsorted'])}"
+            txt += "  ·  " + tr("zostało {count}", count=left)
         self.label.setText(txt)
-        self.setToolTip(f"{pct:.0f}% posortowano, zostało {format_int(s['unsorted'])}. Kliknij, aby zobaczyć statystyki.")
+        self.setToolTip(tr("{percent} posortowano, zostało {count}. Kliknij, aby zobaczyć statystyki.",
+                           percent=pct_txt, count=left))
         self.bar.setValue(int(pct * 10))
 
 
@@ -137,7 +141,7 @@ class StatsPopup(QFrame):
             it = self.lay.takeAt(0)
             if it.widget():
                 it.widget().deleteLater()
-        t = QLabel("Statystyki biblioteki")
+        t = QLabel(tr("Statystyki biblioteki"))
         t.setObjectName("H2")
         self.lay.addWidget(t, 0, 0, 1, 2)
         bar = QProgressBar()
@@ -145,9 +149,11 @@ class StatsPopup(QFrame):
         bar.setValue(int(s["percent"] * 10))
         bar.setTextVisible(False)
         self.lay.addWidget(bar, 1, 0, 1, 2)
-        items = [("Wszystkie multimedia", s["total"]), ("Zdjęcia", s["photos"]), ("Filmy", s["videos"]),
-                 ("Posortowane", s["sorted"]), ("Do posortowania", s["unsorted"]),
-                 ("Ukończono", f"{s['percent']:.1f}%".replace(".", ",")), ("Foldery tematyczne", s["folders"])]
+        done = f"{s['percent']:.1f}%"
+        items = [(tr("Wszystkie multimedia"), s["total"]), (tr("Zdjęcia"), s["photos"]), (tr("Filmy"), s["videos"]),
+                 (tr("Posortowane"), s["sorted"]), (display_folder(UNSORTED_FOLDER), s["unsorted"]),
+                 (tr("Ukończono"), done if is_english() else done.replace(".", ",")),
+                 (tr("Foldery tematyczne"), s["folders"])]
         for i, (k, v) in enumerate(items, start=2):
             kl = QLabel(k)
             kl.setObjectName("Muted")
@@ -185,14 +191,15 @@ class TopBar(QFrame):
         self.crumb_root = QPushButton(ctrl.lib.name)
         self.crumb_root.setObjectName("Crumb")
         self.crumb_root.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.crumb_root.setToolTip(f"{ctrl.lib.root}\nKliknij, aby wrócić do kolejki „{UNSORTED_FOLDER}”")
+        self.crumb_root.setToolTip(tr("{path}\nKliknij, aby wrócić do kolejki „{folder}”",
+                                      path=ctrl.lib.root, folder=display_folder(UNSORTED_FOLDER)))
         self.crumb_root.clicked.connect(lambda: ctrl.set_scope(UNSORTED_FOLDER))
         self.crumb_sep = QLabel()
         self.crumb_cur = QLabel()
         self.crumb_cur.setObjectName("CrumbCurrent")
         for w in (self.crumb_root, self.crumb_sep, self.crumb_cur):
             lay.addWidget(w)
-        self.back_btn = QPushButton("Wróć do sortowania")
+        self.back_btn = QPushButton(tr("Wróć do sortowania"))
         self.back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.back_btn.clicked.connect(lambda: ctrl.set_scope(UNSORTED_FOLDER))
         lay.addSpacing(8)
@@ -202,22 +209,22 @@ class TopBar(QFrame):
         self.progress.clicked.connect(self._show_stats)
         lay.addWidget(self.progress)
         lay.addSpacing(6)
-        self.btn_undo = self._tool("undo", "Cofnij ostatnie przeniesienie (Ctrl+Z)", ctrl.undo)
-        self.btn_bookmark = self._tool("bookmark", "Dodaj zakładkę do bieżącego pliku (Ctrl+D)",
+        self.btn_undo = self._tool("undo", tr("Cofnij ostatnie przeniesienie (Ctrl+Z)"), ctrl.undo)
+        self.btn_bookmark = self._tool("bookmark", tr("Dodaj zakładkę do bieżącego pliku (Ctrl+D)"),
                                        lambda: ctrl.toggle_bookmark())
         self.btn_bookmark.setCheckable(True)
         for b in (self.btn_undo, self.btn_bookmark):
             lay.addWidget(b)
-        self.btn_import = QPushButton("Importuj zdjęcia i filmy")
+        self.btn_import = QPushButton(tr("Importuj zdjęcia i filmy"))
         self.btn_import.setObjectName("Primary")
         self.btn_import.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_import.clicked.connect(self.import_clicked)
         lay.addSpacing(4)
         lay.addWidget(self.btn_import)
         lay.addSpacing(4)
-        self.btn_theme = self._tool("moon", "Jasny / ciemny motyw", self.theme_toggle.emit)
-        self.btn_settings = self._tool("settings", "Ustawienia", self.settings.emit)
-        self.btn_home = self._tool("home", "Ekran główny (zmień bibliotekę)", self.home.emit)
+        self.btn_theme = self._tool("moon", tr("Jasny / ciemny motyw"), self.theme_toggle.emit)
+        self.btn_settings = self._tool("settings", tr("Ustawienia"), self.settings.emit)
+        self.btn_home = self._tool("home", tr("Ekran główny (zmień bibliotekę)"), self.home.emit)
         for b in (self.btn_theme, self.btn_settings, self.btn_home):
             lay.addWidget(b)
         self.stats_popup = StatsPopup(self)
@@ -230,9 +237,9 @@ class TopBar(QFrame):
 
     def set_compact(self, level: int) -> None:
         self.app_name.setVisible(level == 0)
-        self.btn_import.setText({0: "Importuj zdjęcia i filmy", 1: "Importuj", 2: ""}[level])
-        self.btn_import.setToolTip("Importuj zdjęcia i filmy (Ctrl+I)")
-        self.back_btn.setText("Wróć do sortowania" if level == 0 else "Wróć")
+        self.btn_import.setText({0: tr("Importuj zdjęcia i filmy"), 1: tr("Importuj"), 2: ""}[level])
+        self.btn_import.setToolTip(tr("Importuj zdjęcia i filmy (Ctrl+I)"))
+        self.back_btn.setText(tr("Wróć do sortowania") if level == 0 else tr("Wróć"))
         self.progress.set_compact(level > 0)
 
     def _tool(self, icon: str, tip: str, fn) -> QToolButton:
@@ -265,13 +272,14 @@ class TopBar(QFrame):
         self.btn_bookmark.setEnabled(mid is not None and mid >= 0)
         c = theme.current()
         self.btn_bookmark.setIcon(icons.icon("bookmark_fill" if on else "bookmark", c["accent"] if on else c["text"], 20))
-        self.btn_bookmark.setToolTip("Usuń zakładkę (Ctrl+D)" if on else "Dodaj zakładkę do bieżącego pliku (Ctrl+D)")
+        self.btn_bookmark.setToolTip(tr("Usuń zakładkę (Ctrl+D)") if on
+                                     else tr("Dodaj zakładkę do bieżącego pliku (Ctrl+D)"))
 
     def _scope(self, scope: str) -> None:
         if scope == SCOPE_DEVICE:
-            text = f"Telefon: {self.ctrl.device_name}"
+            text = tr("Telefon: {name}", name=self.ctrl.device_name)
         else:
-            text = "Wszystkie multimedia" if scope == SCOPE_ALL else scope
+            text = tr("Wszystkie multimedia") if scope == SCOPE_ALL else display_folder(scope)
         self.crumb_cur.setText(text)
         self.back_btn.setVisible(scope.lower() != UNSORTED_FOLDER.lower())
 
@@ -432,9 +440,9 @@ class LibraryView(QWidget):
         path = ctrl.lib.abs_path(row["rel_path"])
         self.viewer.set_nav(ctrl.index > 0, ctrl.index < len(ctrl.ids) - 1)
         if not path.exists():
-            self.viewer.show_empty("warning", "Plik jest niedostępny",
-                                   "Plik mógł zostać przeniesiony lub usunięty poza programem PhotoSort. "
-                                   "Biblioteka zostanie odświeżona.")
+            self.viewer.show_empty("warning", tr("Plik jest niedostępny"),
+                                   tr("Plik mógł zostać przeniesiony lub usunięty poza programem PhotoSort. "
+                                      "Biblioteka zostanie odświeżona."))
             ctrl.rescan()
             return
         pm = self.thumbs.get(mid)
@@ -474,10 +482,10 @@ class LibraryView(QWidget):
                     self.viewer.show_photo(mid, pm, False)   # miniatura, zanim dojdzie pełne zdjęcie
             elif self.viewer.current_id != mid or e.kind == "video":
                 self.viewer.show_empty("film" if e.kind == "video" else "phone",
-                                       "Wczytywanie z telefonu…",
+                                       tr("Wczytywanie z telefonu…"),
                                        f"{e.name}" + (f" ({e.size / 1048576:.0f} MB)".replace(".", ",")
                                                       if e.size > 1048576 else ""))
-                self.viewer.empty.set_progress(-1, "Czekam na telefon…")
+                self.viewer.empty.set_progress(-1, tr("Czekam na telefon…"))
                 self.viewer.current_id = mid
             ctrl.device_fetch(mid, current=True)
         # wyprzedzająco: dwa kolejne zdjęcia (filmów nie — bywają duże)
@@ -511,9 +519,9 @@ class LibraryView(QWidget):
         if mid != self.ctrl.current_id or self.viewer.current_id != mid or not self.viewer.showing_empty():
             return
         if pct >= 100:
-            self.viewer.empty.set_progress(100, "Otwieranie…")
+            self.viewer.empty.set_progress(100, tr("Otwieranie…"))
         else:
-            self.viewer.empty.set_progress(pct, f"Kopiowanie z telefonu: {pct}%")
+            self.viewer.empty.set_progress(pct, tr("Kopiowanie z telefonu: {percent}%", percent=pct))
 
     def _scan_tick_update(self) -> None:
         ctrl = self.ctrl
@@ -524,9 +532,9 @@ class LibraryView(QWidget):
     def _device_fetch_failed(self, mid: int, msg: str) -> None:
         if mid != self.ctrl.current_id:
             return
-        self.viewer.show_empty("warning", "Nie udało się wczytać pliku z telefonu",
-                               msg + "\nMożesz nadal przeciągnąć miniaturę do folderu — program spróbuje "
-                               "skopiować plik ponownie.")
+        self.viewer.show_empty("warning", tr("Nie udało się wczytać pliku z telefonu"),
+                               msg + "\n" + tr("Możesz nadal przeciągnąć miniaturę do folderu — program "
+                                               "spróbuje skopiować plik ponownie."))
         self.viewer.current_id = mid
 
     def _empty_action(self) -> None:
@@ -567,9 +575,9 @@ class LibraryView(QWidget):
     def _image_failed(self, mid: int, err: str) -> None:
         if mid != self.ctrl.current_id or self.viewer.is_video():
             return
-        self.viewer.show_empty("warning", "Nie można wyświetlić tego zdjęcia",
-                               "Plik może być uszkodzony lub zapisany w nieobsługiwanym formacie. "
-                               "Możesz go nadal przenieść do folderu (przeciągnij miniaturę).")
+        self.viewer.show_empty("warning", tr("Nie można wyświetlić tego zdjęcia"),
+                               tr("Plik może być uszkodzony lub zapisany w nieobsługiwanym formacie. "
+                                  "Możesz go nadal przenieść do folderu (przeciągnij miniaturę)."))
         self.viewer.current_id = mid
 
     def _thumb_ready(self, mid: int) -> None:
@@ -600,61 +608,67 @@ class LibraryView(QWidget):
             self.meta.clear()
             if ctrl.device_status == "scanning":
                 import time
-                what = (f"Szukam {ctrl.device_limit} najnowszych zdjęć, których nie ma jeszcze w bibliotece"
-                        if ctrl.device_limit else "Szukam zdjęć, których nie ma jeszcze w bibliotece "
-                                                  "(pojawią się od najnowszych)")
-                step = ctrl.device_scan_text or "Łączenie z telefonem…"
-                step = step.replace("Otwieram folder telefonu: ", "Otwieram folder: ").split("  (")[0]
+                what = (tr("Szukam {count} najnowszych zdjęć, których nie ma jeszcze w bibliotece",
+                           count=ctrl.device_limit)
+                        if ctrl.device_limit else tr("Szukam zdjęć, których nie ma jeszcze w bibliotece "
+                                                     "(pojawią się od najnowszych)"))
+                step = ctrl.device_scan_text or tr("Łączenie z telefonem…")
+                step = (step.replace("Otwieram folder telefonu: ", "Otwieram folder: ")  # i18n: ignore
+                        .replace("Opening phone folder: ", "Opening folder: ").split("  (")[0])
                 secs = int(time.time() - ctrl.device_scan_since) if ctrl.device_scan_since else 0
-                slow = ("\nDuże foldery iPhone'a (kilkaset zdjęć) otwierają się nawet 1–2 minuty — "
-                        "to normalne." if secs >= 15 else "")
-                self.viewer.show_empty("phone", "Wczytywanie zdjęć z telefonu…",
-                                       f"{what}. Nie odłączaj telefonu i nie blokuj ekranu. Nic nie jest "
-                                       "kopiowane na komputer.", "Przerwij")
+                slow = ("\n" + tr("Duże foldery iPhone'a (kilkaset zdjęć) otwierają się nawet 1–2 minuty — "
+                                  "to normalne.") if secs >= 15 else "")
+                self.viewer.show_empty("phone", tr("Wczytywanie zdjęć z telefonu…"),
+                                       tr("{what}. Nie odłączaj telefonu i nie blokuj ekranu. Nic nie jest "
+                                          "kopiowane na komputer.", what=what), tr("Przerwij"))
                 found, limit = ctrl.device_found, ctrl.device_limit
-                info = f"{step} · {secs} s{slow}\nSprawdzono {ctrl.device_scan_count} plików"
+                info = f"{step} · {secs} s{slow}\n" + tr("Sprawdzono {count} plików", count=ctrl.device_scan_count)
                 if limit and found:
                     self.viewer.empty.set_progress(found * 100 // limit,
-                                                   f"Znaleziono {found} z {limit} ({found * 100 // limit}%)\n{info}")
+                                                   tr("Znaleziono {found} z {limit} ({percent}%)",
+                                                      found=found, limit=limit, percent=found * 100 // limit)
+                                                   + "\n" + info)
                 else:
-                    self.viewer.empty.set_progress(-1, (f"Znaleziono {found}\n" if found else "") + info)
+                    self.viewer.empty.set_progress(-1, (tr("Znaleziono {found}", found=found) + "\n" if found else "")
+                                                   + info)
             elif ctrl.device_status == "error":
-                self.viewer.show_empty("warning", "Brak połączenia z telefonem", ctrl.device_error,
-                                       "Zakończ przeglądanie telefonu")
+                self.viewer.show_empty("warning", tr("Brak połączenia z telefonem"), ctrl.device_error,
+                                       tr("Zakończ przeglądanie telefonu"))
             elif ctrl.filters.is_active():
-                self.viewer.show_empty("search", "Brak plików pasujących do filtrów",
-                                       "Zmień lub wyczyść filtry.")
+                self.viewer.show_empty("search", tr("Brak plików pasujących do filtrów"),
+                                       tr("Zmień lub wyczyść filtry."))
             elif ctrl.device_more:
                 n = ctrl.device_limit or 15
-                self.viewer.show_empty("check", "Ta partia jest przejrzana",
-                                       "Na telefonie są jeszcze starsze zdjęcia. Wczytać kolejne?",
-                                       f"Pokaż kolejne {n} zdjęć z telefonu")
+                self.viewer.show_empty("check", tr("Ta partia jest przejrzana"),
+                                       tr("Na telefonie są jeszcze starsze zdjęcia. Wczytać kolejne?"),
+                                       tr("Pokaż kolejne {count} zdjęć z telefonu", count=n))
             else:
-                self.viewer.show_empty("check", "Na telefonie nie ma już nowych zdjęć",
-                                       "Wszystkie zdjęcia i filmy z wybranych folderów telefonu są już "
-                                       "w bibliotece.")
+                self.viewer.show_empty("check", tr("Na telefonie nie ma już nowych zdjęć"),
+                                       tr("Wszystkie zdjęcia i filmy z wybranych folderów telefonu są już "
+                                          "w bibliotece."))
             return
         stats = ctrl.lib.stats()
         if ctrl.filters.is_active():
-            self.viewer.show_empty("search", "Brak plików pasujących do filtrów",
-                                   "Zmień lub wyczyść filtry, aby zobaczyć więcej zdjęć i filmów.")
+            self.viewer.show_empty("search", tr("Brak plików pasujących do filtrów"),
+                                   tr("Zmień lub wyczyść filtry, aby zobaczyć więcej zdjęć i filmów."))
         elif ctrl.scope.lower() == UNSORTED_FOLDER.lower():
             if stats["total"] == 0:
-                self.viewer.show_empty("import", "Zacznij od zaimportowania zdjęć",
-                                       "Podłącz telefon, aparat lub pendrive albo wskaż folder na komputerze. "
-                                       "Pliki zostaną skopiowane — oryginały pozostaną nietknięte.",
-                                       "Importuj zdjęcia i filmy")
+                self.viewer.show_empty("import", tr("Zacznij od zaimportowania zdjęć"),
+                                       tr("Podłącz telefon, aparat lub pendrive albo wskaż folder na komputerze. "
+                                          "Pliki zostaną skopiowane — oryginały pozostaną nietknięte."),
+                                       tr("Importuj zdjęcia i filmy"))
             else:
-                self.viewer.show_empty("check", "Wszystko posortowane!",
-                                       f"Brak plików w folderze „{UNSORTED_FOLDER}”. Możesz przeglądać foldery "
-                                       "po prawej stronie albo zaimportować kolejne zdjęcia.",
-                                       "Importuj zdjęcia i filmy")
+                self.viewer.show_empty("check", tr("Wszystko posortowane!"),
+                                       tr("Brak plików w folderze „{folder}”. Możesz przeglądać foldery "
+                                          "po prawej stronie albo zaimportować kolejne zdjęcia.",
+                                          folder=display_folder(UNSORTED_FOLDER)),
+                                       tr("Importuj zdjęcia i filmy"))
         elif ctrl.scope == SCOPE_ALL:
-            self.viewer.show_empty("photo", "Biblioteka jest pusta", "Zaimportuj zdjęcia i filmy, aby zacząć.",
-                                   "Importuj zdjęcia i filmy")
+            self.viewer.show_empty("photo", tr("Biblioteka jest pusta"),
+                                   tr("Zaimportuj zdjęcia i filmy, aby zacząć."), tr("Importuj zdjęcia i filmy"))
         else:
-            self.viewer.show_empty("folder", "Ten folder jest pusty",
-                                   "Przeciągnij tu zdjęcia lub filmy z kolejki, aby je posortować.")
+            self.viewer.show_empty("folder", tr("Ten folder jest pusty"),
+                                   tr("Przeciągnij tu zdjęcia lub filmy z kolejki, aby je posortować."))
 
     # ------------------------------------------------------------------ #
     # Przeciąganie z dużego podglądu

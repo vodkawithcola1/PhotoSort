@@ -360,3 +360,11 @@ def test_import_limit_takes_newest_and_continues(library, tmp_path):
     # bez limitu — reszta
     st3 = Importer(library, library.db).import_paths(collect_media_files([src]))
     assert st3.copied == 10 and not st3.limit_reached
+
+
+def test_abs_path_stays_inside_library(library):
+    from app.core.library_manager import LibraryError
+    assert library.abs_path("Rodzina/IMG_0001.JPG") == library.root / "Rodzina" / "IMG_0001.JPG"
+    for bad in ("../poza.jpg", "C:/Windows/win.ini", r"\serwer\udzial\x.jpg", r"A\..\..\x.jpg"):
+        with pytest.raises(LibraryError):
+            library.abs_path(bad)

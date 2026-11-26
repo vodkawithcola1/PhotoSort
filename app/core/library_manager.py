@@ -19,7 +19,7 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Callable
 
 from app.constants import (
@@ -27,6 +27,7 @@ from app.constants import (
     UNSORTED_FOLDER, media_kind,
 )
 from app.database.database import Database
+from app.i18n import display_folder, tr
 from app.utils.formatting import pl_sort_key
 from app.utils.paths import file_creation_time, is_hidden_name, set_hidden, validate_folder_name
 
@@ -78,7 +79,7 @@ class Library:
             # Nigdy nie nadpisujemy istniejących folderów ani bibliotek.
             raise FileExistsError(str(root))
         if not Path(parent).is_dir():
-            raise LibraryError(f"Lokalizacja nie istnieje: {parent}")
+            raise LibraryError(tr("Lokalizacja nie istnieje: {path}", path=parent))
         root.mkdir()
         (root / UNSORTED_FOLDER).mkdir()
         data = root / DATA_DIR
@@ -96,10 +97,10 @@ class Library:
     def open(cls, root: Path) -> "Library":
         root = Path(root)
         if not root.is_dir():
-            raise LibraryError(f"Folder biblioteki nie istnieje:\n{root}")
+            raise LibraryError(tr("Folder biblioteki nie istnieje:\n{path}", path=root))
         data = root / DATA_DIR
         if not (data / DB_FILE).is_file():
-            raise LibraryError("Wybrany folder nie jest biblioteką PhotoSort.")
+            raise LibraryError(tr("Wybrany folder nie jest biblioteką PhotoSort."))
         for sub in (THUMBS_DIR, STAGING_DIR):
             (data / sub).mkdir(exist_ok=True)
         (root / UNSORTED_FOLDER).mkdir(exist_ok=True)
@@ -121,6 +122,10 @@ class Library:
         self.db.close()
 
     def abs_path(self, rel_path: str) -> Path:
+        # ścieżki z bazy zawsze są względne wobec katalogu biblioteki — nie wychodź poza nią
+        rel = PureWindowsPath(rel_path)
+        if rel.anchor or rel.drive or ".." in rel.parts:
+            raise LibraryError(f"Invalid path outside the library: {rel_path}")
         return self.root / Path(rel_path)
 
     def thumb_path(self, media_id: int) -> Path:
@@ -315,13 +320,13 @@ class Library:
         name = name.strip()
         target = self.root / name
         if target.exists() or name.lower() in {d.lower() for d in self.folder_dirs()}:
-            raise LibraryError(f"Folder „{name}” już istnieje.")
+            raise LibraryError(tr("Folder „{folder}” już istnieje.", folder=display_folder(name)))
         target.mkdir()
         return name
 
     def rename_folder(self, old: str, new: str) -> str:
         if old.lower() == UNSORTED_FOLDER.lower():
-            raise LibraryError("Folderu „Do posortowania” nie można zmienić.")
+            raise LibraryError(tr("Folderu „Do posortowania” nie można zmienić."))
         error = validate_folder_name(new)
         if error:
             raise LibraryError(error)
@@ -331,11 +336,12 @@ class Library:
         src = self.root / old
         dst = self.root / new
         if new.lower() != old.lower() and (dst.exists() or new.lower() == UNSORTED_FOLDER.lower()):
-            raise LibraryError(f"Folder „{new}” już istnieje.")
+            raise LibraryError(tr("Folder „{folder}” już istnieje.", folder=display_folder(new)))
         try:
             os.rename(src, dst)
         except OSError as exc:
-            raise LibraryError(f"Nie udało się zmienić nazwy folderu:\n{exc.strerror or exc}") from exc
+            raise LibraryError(tr("Nie udało się zmienić nazwy folderu:\n{error}",
+                                  error=exc.strerror or exc)) from exc
         prefix_len = len(old) + 1
         with self.db.transaction() as db:
             db.execute("UPDATE media SET folder=?, rel_path=? || substr(rel_path, ?) "
@@ -350,20 +356,20 @@ class Library:
     def delete_folder(self, name: str) -> None:
         """Usuwa wyłącznie pusty folder."""
         if name.lower() == UNSORTED_FOLDER.lower():
-            raise LibraryError("Folderu „Do posortowania” nie można usunąć.")
+            raise LibraryError(tr("Folderu „Do posortowania” nie można usunąć."))
         target = self.root / name
         if not target.is_dir():
-            raise LibraryError("Folder nie istnieje.")
+            raise LibraryError(tr("Folder nie istnieje."))
         # Pusty = brak jakichkolwiek plików (również innych niż zdjęcia) poza systemowymi.
         for _dirpath, _dirs, files in os.walk(target):
             real = [f for f in files if f.lower() not in {"thumbs.db", "desktop.ini"}]
             if real:
-                raise LibraryError("Można usunąć tylko pusty folder. "
-                                   "Najpierw przenieś z niego zdjęcia i filmy.")
+                raise LibraryError(tr("Można usunąć tylko pusty folder. "
+                                      "Najpierw przenieś z niego zdjęcia i filmy."))
         try:
             shutil.rmtree(target)
         except OSError as exc:
-            raise LibraryError(f"Nie udało się usunąć folderu:\n{exc}") from exc
+            raise LibraryError(tr("Nie udało się usunąć folderu:\n{error}", error=exc)) from exc
 
     # ------------------------------------------------------------------ #
     # Statystyki

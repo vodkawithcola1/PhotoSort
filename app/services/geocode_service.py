@@ -11,23 +11,27 @@ import sys
 import threading
 from pathlib import Path
 
+from app.i18n import is_english, tr
+
+# Polskie nazwy krajów i miast — używane tylko w polskim interfejsie
+# (po angielsku: nazwy z GeoNames). To dane, nie tekst do tr().
 COUNTRY_PL = {
-    "PL": "Polska", "DE": "Niemcy", "CZ": "Czechy", "SK": "Słowacja", "UA": "Ukraina",
-    "LT": "Litwa", "LV": "Łotwa", "EE": "Estonia", "BY": "Białoruś", "RU": "Rosja",
-    "AT": "Austria", "CH": "Szwajcaria", "IT": "Włochy", "FR": "Francja", "ES": "Hiszpania",
+    "PL": "Polska", "DE": "Niemcy", "CZ": "Czechy", "SK": "Słowacja", "UA": "Ukraina",  # i18n: ignore
+    "LT": "Litwa", "LV": "Łotwa", "EE": "Estonia", "BY": "Białoruś", "RU": "Rosja",  # i18n: ignore
+    "AT": "Austria", "CH": "Szwajcaria", "IT": "Włochy", "FR": "Francja", "ES": "Hiszpania",  # i18n: ignore
     "PT": "Portugalia", "GB": "Wielka Brytania", "IE": "Irlandia", "NL": "Holandia",
     "BE": "Belgia", "LU": "Luksemburg", "DK": "Dania", "SE": "Szwecja", "NO": "Norwegia",
-    "FI": "Finlandia", "IS": "Islandia", "HU": "Węgry", "RO": "Rumunia", "BG": "Bułgaria",
-    "GR": "Grecja", "TR": "Turcja", "HR": "Chorwacja", "SI": "Słowenia", "RS": "Serbia",
-    "BA": "Bośnia i Hercegowina", "ME": "Czarnogóra", "MK": "Macedonia Północna",
-    "AL": "Albania", "MT": "Malta", "CY": "Cypr", "MD": "Mołdawia", "GE": "Gruzja",
-    "AM": "Armenia", "AZ": "Azerbejdżan", "EG": "Egipt", "TN": "Tunezja", "MA": "Maroko",
+    "FI": "Finlandia", "IS": "Islandia", "HU": "Węgry", "RO": "Rumunia", "BG": "Bułgaria",  # i18n: ignore
+    "GR": "Grecja", "TR": "Turcja", "HR": "Chorwacja", "SI": "Słowenia", "RS": "Serbia",  # i18n: ignore
+    "BA": "Bośnia i Hercegowina", "ME": "Czarnogóra", "MK": "Macedonia Północna",  # i18n: ignore
+    "AL": "Albania", "MT": "Malta", "CY": "Cypr", "MD": "Mołdawia", "GE": "Gruzja",  # i18n: ignore
+    "AM": "Armenia", "AZ": "Azerbejdżan", "EG": "Egipt", "TN": "Tunezja", "MA": "Maroko",  # i18n: ignore
     "US": "Stany Zjednoczone", "CA": "Kanada", "MX": "Meksyk", "BR": "Brazylia",
     "AR": "Argentyna", "CN": "Chiny", "JP": "Japonia", "IN": "Indie", "TH": "Tajlandia",
     "VN": "Wietnam", "ID": "Indonezja", "AU": "Australia", "NZ": "Nowa Zelandia",
     "AE": "Zjednoczone Emiraty Arabskie", "IL": "Izrael", "JO": "Jordania", "ZA": "RPA",
     "KE": "Kenia", "TZ": "Tanzania", "DO": "Dominikana", "CU": "Kuba", "SC": "Seszele",
-    "MV": "Malediwy", "LK": "Sri Lanka", "KR": "Korea Południowa", "SG": "Singapur",
+    "MV": "Malediwy", "LK": "Sri Lanka", "KR": "Korea Południowa", "SG": "Singapur",  # i18n: ignore
     "MY": "Malezja", "PH": "Filipiny", "VA": "Watykan", "SM": "San Marino", "MC": "Monako",
     "AD": "Andora", "LI": "Liechtenstein",
 }
@@ -36,9 +40,9 @@ CITY_PL = {
     ("PL", "Warsaw"): "Warszawa", ("IT", "Rome"): "Rzym", ("IT", "Milan"): "Mediolan",
     ("IT", "Venice"): "Wenecja", ("IT", "Naples"): "Neapol", ("IT", "Florence"): "Florencja",
     ("DE", "Munich"): "Monachium", ("DE", "Cologne"): "Kolonia", ("CZ", "Prague"): "Praga",
-    ("AT", "Vienna"): "Wiedeń", ("GB", "London"): "Londyn", ("FR", "Paris"): "Paryż",
+    ("AT", "Vienna"): "Wiedeń", ("GB", "London"): "Londyn", ("FR", "Paris"): "Paryż",  # i18n: ignore
     ("BE", "Brussels"): "Bruksela", ("DK", "Copenhagen"): "Kopenhaga",
-    ("LT", "Vilnius"): "Wilno", ("UA", "Lviv"): "Lwów", ("UA", "Kyiv"): "Kijów",
+    ("LT", "Vilnius"): "Wilno", ("UA", "Lviv"): "Lwów", ("UA", "Kyiv"): "Kijów",  # i18n: ignore
     ("ES", "Seville"): "Sewilla", ("PT", "Lisbon"): "Lizbona", ("GR", "Athens"): "Ateny",
     ("HU", "Budapest"): "Budapeszt", ("SE", "Stockholm"): "Sztokholm", ("NL", "The Hague"): "Haga",
 }
@@ -85,6 +89,8 @@ class Geocoder:
             return cls._instance
 
     def country_name(self, cc: str) -> str:
+        if is_english():
+            return self.countries.get(cc) or cc
         return COUNTRY_PL.get(cc) or self.countries.get(cc) or cc
 
     def lookup(self, lat: float, lon: float) -> str | None:
@@ -103,9 +109,12 @@ class Geocoder:
         if best is None or best_d > 60:
             return None
         name, cc = best
-        name = CITY_PL.get((cc, name), name)
-        prefix = "okolice: " if best_d > 4 else ""
-        return f"{prefix}{name}, {self.country_name(cc)}"
+        if not is_english():
+            name = CITY_PL.get((cc, name), name)
+        place = f"{name}, {self.country_name(cc)}"
+        if best_d > 4:
+            return tr("okolice: {place}", place=place)
+        return place
 
 
 def _haversine_km(lat1, lon1, lat2, lon2) -> float:

@@ -1,18 +1,21 @@
 """Główne okno: ekran powitalny <-> widok biblioteki."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, Qt, QTimer
+from PySide6.QtCore import QByteArray, QProcess, Qt, QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox, QStackedWidget
 
-from app.constants import APP_NAME
+from app import i18n
+from app.constants import APP_NAME, UNSORTED_FOLDER
 from app.core.library_controller import LibraryController
 from app.core.library_manager import Library, LibraryError, is_library
 from app.core.session_manager import AppSettings
+from app.i18n import display_folder, tr
 from app.services.thumbnail_service import ThumbnailService
 from app.ui import icons, theme
-from app.ui.dialogs import confirm
+from app.ui.dialogs import confirm, info
 from app.ui.import_dialog import DeviceDialog, ImportProgressDialog, ImportSourceDialog
 from app.ui.library_view import LibraryView
 from app.ui.settings_dialog import SettingsDialog
@@ -44,6 +47,7 @@ class MainWindow(QMainWindow):
         self.welcome.open_path.connect(lambda p: self.open_library(Path(p)))
         self.welcome.remove_recent.connect(self._remove_recent)
         self.welcome.theme_btn.clicked.connect(self.toggle_theme)
+        self.welcome.language_toggle.connect(self.change_language)
         self.stack.addWidget(self.welcome)
         self.welcome.set_recent(self.settings.recent())
         self.welcome.refresh_theme()
@@ -85,16 +89,17 @@ class MainWindow(QMainWindow):
         try:
             lib = Library.create(target.parent, target.name)
         except FileExistsError:
-            QMessageBox.warning(self, APP_NAME, f"Folder „{target.name}” już istnieje. Wybierz inną nazwę.")
+            QMessageBox.warning(self, APP_NAME, tr("Folder „{name}” już istnieje. Wybierz inną nazwę.",
+                                                   name=target.name))
             return
         except (LibraryError, OSError) as exc:
-            QMessageBox.warning(self, APP_NAME, f"Nie udało się utworzyć biblioteki:\n{exc}")
+            QMessageBox.warning(self, APP_NAME, tr("Nie udało się utworzyć biblioteki:\n{error}", error=exc))
             return
         lib.close()
         self.open_library(target)
 
     def open_library_dialog(self) -> None:
-        d = QFileDialog.getExistingDirectory(self, "Wskaż folder biblioteki PhotoSort", str(desktop_dir()))
+        d = QFileDialog.getExistingDirectory(self, tr("Wskaż folder biblioteki PhotoSort"), str(desktop_dir()))
         if not d:
             return
         path = Path(d)
@@ -108,9 +113,9 @@ class MainWindow(QMainWindow):
 
     def open_library(self, path: Path) -> None:
         if not is_library(path):
-            QMessageBox.warning(self, APP_NAME, f"Ten folder nie jest biblioteką PhotoSort:\n{path}\n\n"
-                                "Aby uporządkować zdjęcia z tego folderu, utwórz nową bibliotekę i użyj "
-                                "„Importuj zdjęcia i filmy”.")
+            QMessageBox.warning(self, APP_NAME, tr("Ten folder nie jest biblioteką PhotoSort:\n{path}\n\n"
+                                                   "Aby uporządkować zdjęcia z tego folderu, utwórz nową "
+                                                   "bibliotekę i użyj „Importuj zdjęcia i filmy”.", path=path))
             self.settings.remove_recent(str(path))
             self.welcome.set_recent(self.settings.recent())
             return
@@ -191,7 +196,7 @@ class MainWindow(QMainWindow):
         if self.library is None:
             return
         if self._import_dialog is not None and self._import_dialog.worker.isRunning():
-            QMessageBox.information(self, APP_NAME, "Trwa już import. Poczekaj na jego zakończenie.")
+            QMessageBox.information(self, APP_NAME, tr("Trwa już import. Poczekaj na jego zakończenie."))
             return
         dlg = ImportProgressDialog(self.library, self, paths, recursive, device, device_folders, limit)
         dlg.finished_ok.connect(self._import_done)
@@ -220,15 +225,41 @@ class MainWindow(QMainWindow):
         paths = [p for p in paths if not str(p.resolve()).lower().startswith(root)]
         if not paths:
             return
-        text = (f"Zaimportować {count_pl(len(paths), 'element', 'elementy', 'elementów')} do biblioteki?\n\n"
-                "Pliki zostaną skopiowane do folderu „Do posortowania”. Oryginały pozostaną na swoim miejscu.")
-        QTimer.singleShot(0, lambda: confirm(self, "Import", text, "Importuj") and self.run_import(paths=paths))
+        text = tr("Zaimportować {items} do biblioteki?\n\n"
+                  "Pliki zostaną skopiowane do folderu „{folder}”. Oryginały pozostaną na swoim miejscu.",
+                  items=count_pl(len(paths), "element", "elementy", "elementów"),
+                  folder=display_folder(UNSORTED_FOLDER))
+        QTimer.singleShot(0, lambda: confirm(self, tr("Import"), text, tr("Importuj"))
+                          and self.run_import(paths=paths))
 
     # ------------------------------------------------------------------ #
     def open_settings(self) -> None:
         d = SettingsDialog(self.ctrl, self)
         d.theme_selected.connect(self.set_theme)
+        d.language_selected.connect(lambda code: self.change_language(code, d))
         d.exec()
+
+    # ------------------------------------------------------------------ #
+    # Język interfejsu (zmiana wymaga ponownego uruchomienia programu)
+    # ------------------------------------------------------------------ #
+    def change_language(self, code: str, dialog=None) -> None:
+        self.settings.set("language", code)
+        if code == i18n.language():
+            return
+        parent = dialog or self
+        if confirm(parent, APP_NAME, tr("Język interfejsu zmieni się po ponownym uruchomieniu programu.\n\n"
+                                        "Uruchomić program ponownie teraz?"),
+                   tr("Uruchom ponownie"), tr("Później")):
+            if dialog is not None:
+                dialog.accept()
+            QTimer.singleShot(0, self.restart)
+        else:
+            info(parent, APP_NAME, tr("Nowy język zostanie użyty przy następnym uruchomieniu programu."))
+
+    def restart(self) -> None:
+        # close() zapisuje stan jak przy zwykłym zamknięciu (i może zostać anulowane, np. w trakcie importu)
+        if self.close():
+            QProcess.startDetached(sys.executable, sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv)
 
     def toggle_fullscreen(self) -> None:
         if self.view is None:
@@ -246,16 +277,17 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, e) -> None:
         if self._import_dialog is not None and self._import_dialog.worker.isRunning():
-            if not confirm(self, APP_NAME, "Trwa import. Przerwać import i zamknąć program?\n"
-                           "Skopiowane do tej pory pliki zostaną zachowane.", "Przerwij i zamknij"):
+            if not confirm(self, APP_NAME, tr("Trwa import. Przerwać import i zamknąć program?\n"
+                                              "Skopiowane do tej pory pliki zostaną zachowane."),
+                           tr("Przerwij i zamknij")):
                 e.ignore()
                 return
             self._import_dialog.worker.cancel()
             self._import_dialog.worker.wait(15000)
         if self.ctrl is not None and self.ctrl._pending_device:
-            if not confirm(self, APP_NAME, "Trwa kopiowanie zdjęć z telefonu do folderów.\n"
-                           "Zamknąć program teraz? Niedokończone kopie zostaną pominięte "
-                           "(zdjęcia zostaną na telefonie).", "Zamknij"):
+            if not confirm(self, APP_NAME, tr("Trwa kopiowanie zdjęć z telefonu do folderów.\n"
+                                              "Zamknąć program teraz? Niedokończone kopie zostaną pominięte "
+                                              "(zdjęcia zostaną na telefonie)."), tr("Zamknij")):
                 e.ignore()
                 return
         if self.isFullScreen():

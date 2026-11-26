@@ -21,6 +21,7 @@ from app.core.library_manager import Library, LibraryError
 from app.core.media_manager import Filters, MediaManager, MoveResult
 from app.core.session_manager import SessionManager, SessionState
 from app.core.workers import MetadataWorker, ScanWorker
+from app.i18n import display_folder, tr
 from app.utils.formatting import count_pl
 
 
@@ -264,7 +265,7 @@ class LibraryController(QObject):
         """Przejście do pliku (np. z zakładki) — otwiera jego folder."""
         row = self.mm.get(media_id)
         if row is None:
-            self.error.emit("Ten plik nie jest już dostępny w bibliotece.")
+            self.error.emit(tr("Ten plik nie jest już dostępny w bibliotece."))
             return
         if self.scope != SCOPE_ALL and row["folder"].lower() != self.scope.lower():
             self.state.positions[row["folder"]] = media_id
@@ -304,10 +305,11 @@ class LibraryController(QObject):
             self._undo_tokens.append({"type": "move", "batch": lres.batch})
             self._after_move(lres.moved, folder)
             n = len(lres.moved)
-            self.toast.emit(f"Przeniesiono {count_pl(n, 'plik', 'pliki', 'plików')} do „{folder}”", True)
+            self.toast.emit(tr("Przeniesiono {files} do „{folder}”", files=count_pl(n, 'plik', 'pliki', 'plików'),
+                               folder=display_folder(folder)), True)
         if lres.errors:
-            self.error.emit("Nie udało się przenieść niektórych plików. Pliki źródłowe pozostały "
-                            "na swoim miejscu.\n\n" + "\n".join(lres.errors[:12]))
+            self.error.emit(tr("Nie udało się przenieść niektórych plików. Pliki źródłowe pozostały "
+                               "na swoim miejscu.") + "\n\n" + "\n".join(lres.errors[:12]))
         self.save_now()
         res.moved.extend(lres.moved)
         res.errors.extend(lres.errors)
@@ -356,7 +358,7 @@ class LibraryController(QObject):
         if self._undo_tokens and self._undo_tokens[-1]["type"] == "device":
             token = self._undo_tokens[-1]
             if token["pending"]:
-                self.toast.emit("Poczekaj, aż skończy się kopiowanie z telefonu", False)
+                self.toast.emit(tr("Poczekaj, aż skończy się kopiowanie z telefonu"), False)
                 return
             self._undo_tokens.pop()
             self._undo_device(token)
@@ -375,9 +377,10 @@ class LibraryController(QObject):
             if first in self.ids:
                 self.select_id(first)
             self.folders_changed.emit()
-            self.toast.emit(f"Cofnięto przeniesienie ({count_pl(len(res.moved), 'plik', 'pliki', 'plików')})", False)
+            self.toast.emit(tr("Cofnięto przeniesienie ({files})",
+                               files=count_pl(len(res.moved), 'plik', 'pliki', 'plików')), False)
         if res.errors:
-            self.error.emit("Nie udało się cofnąć wszystkich plików:\n" + "\n".join(res.errors[:12]))
+            self.error.emit(tr("Nie udało się cofnąć wszystkich plików:") + "\n" + "\n".join(res.errors[:12]))
         self.emit_undo()
         self.emit_stats()
         self.bookmarks_changed.emit()
@@ -387,16 +390,19 @@ class LibraryController(QObject):
         if self._undo_tokens and self._undo_tokens[-1]["type"] == "device":
             t = self._undo_tokens[-1]
             n = len(t["done"]) or len(t["idxs"])
-            self.undo_changed.emit(True, f"Cofnij skopiowanie {count_pl(n, 'pliku', 'plików', 'plików')} z telefonu "
-                                         f"do „{t['folder']}” (Ctrl+Z) — zdjęcia zostają na telefonie")
+            self.undo_changed.emit(True, tr("Cofnij skopiowanie {files} z telefonu do „{folder}” (Ctrl+Z) "
+                                            "— zdjęcia zostają na telefonie",
+                                            files=count_pl(n, 'pliku', 'plików', 'plików'),
+                                            folder=display_folder(t['folder'])))
             return
         info = self.mm.last_batch_info()
         if info:
             _b, n, folder = info
-            self.undo_changed.emit(True, f"Cofnij przeniesienie {count_pl(n, 'pliku', 'plików', 'plików')} "
-                                         f"do „{folder}” (Ctrl+Z)")
+            self.undo_changed.emit(True, tr("Cofnij przeniesienie {files} do „{folder}” (Ctrl+Z)",
+                                            files=count_pl(n, 'pliku', 'plików', 'plików'),
+                                            folder=display_folder(folder)))
         else:
-            self.undo_changed.emit(False, "Brak operacji do cofnięcia")
+            self.undo_changed.emit(False, tr("Brak operacji do cofnięcia"))
 
     # ------------------------------------------------------------------ #
     # Telefon: sesja „Sortuj prosto z telefonu”
@@ -480,9 +486,9 @@ class LibraryController(QObject):
 
     def _on_dev_disconnected(self) -> None:
         self.device_status = "error"
-        self.device_error = ("Telefon został odłączony albo zablokowany. Zdjęcia, które zdążyłeś przeciągnąć do "
-                             "folderów, są już na komputerze. Podłącz i odblokuj telefon, a potem otwórz go "
-                             "ponownie: Importuj zdjęcia i filmy → Telefon lub aparat.")
+        self.device_error = tr("Telefon został odłączony albo zablokowany. Zdjęcia, które zdążyłeś przeciągnąć do "
+                               "folderów, są już na komputerze. Podłącz i odblokuj telefon, a potem otwórz go "
+                               "ponownie: Importuj zdjęcia i filmy → Telefon lub aparat.")
         self.device_order = []
         self.device_changed.emit()
         if self.scope == SCOPE_DEVICE:
@@ -547,7 +553,7 @@ class LibraryController(QObject):
         if self.device is None:
             return
         if not (self.lib.root / folder).is_dir():
-            self.error.emit(f"Folder „{folder}” nie istnieje.")
+            self.error.emit(tr("Folder „{folder}” nie istnieje.", folder=display_folder(folder)))
             return
         idxs = [dev_idx(m) for m in mids if dev_idx(m) in self.device_entries
                 and dev_idx(m) not in self._pending_device and dev_idx(m) in self.device_order]
@@ -580,18 +586,20 @@ class LibraryController(QObject):
         else:
             token["failed"] += 1
             self._reinsert_device(idx)
-            self.error.emit("Nie udało się skopiować pliku z telefonu. Plik pozostał na liście telefonu.\n\n"
-                            + msg)
+            self.error.emit(tr("Nie udało się skopiować pliku z telefonu. Plik pozostał na liście telefonu.")
+                            + "\n\n" + msg)
         if token["pending"] == 0:
             if not token["done"] and token in self._undo_tokens:
                 self._undo_tokens.remove(token)
             parts = []
             if token["done"]:
                 n = len(token["done"])
-                parts.append(f"Skopiowano z telefonu {count_pl(n, 'plik', 'pliki', 'plików')} do „{token['folder']}”")
+                parts.append(tr("Skopiowano z telefonu {files} do „{folder}”",
+                                files=count_pl(n, 'plik', 'pliki', 'plików'),
+                                folder=display_folder(token['folder'])))
             if token["dups"]:
-                parts.append(f"{count_pl(token['dups'], 'plik był', 'pliki były', 'plików było')} już w bibliotece "
-                             "— pominięto")
+                parts.append(tr("{files} już w bibliotece — pominięto",
+                                files=count_pl(token['dups'], 'plik był', 'pliki były', 'plików było')))
             if parts:
                 self.toast.emit(" · ".join(parts), bool(token["done"]))
             self.folders_changed.emit()
@@ -620,7 +628,7 @@ class LibraryController(QObject):
                     if path.exists() and row["hash"] and hash_file(path) == row["hash"]:
                         os.remove(path)
                     elif path.exists():
-                        problems.append(f"{row['filename']}: plik został zmieniony — nie usunięto")
+                        problems.append(tr("{name}: plik został zmieniony — nie usunięto", name=row['filename']))
                         continue
                 except OSError as exc:
                     problems.append(f"{row['filename']}: {exc.strerror or exc}")
@@ -642,10 +650,10 @@ class LibraryController(QObject):
         self.device_changed.emit()
         self.emit_stats()
         self.emit_undo()
-        self.toast.emit(f"Cofnięto: usunięto z komputera {count_pl(restored, 'kopię', 'kopie', 'kopii')} "
-                        "— zdjęcia są nadal na telefonie", False)
+        self.toast.emit(tr("Cofnięto: usunięto z komputera {copies} — zdjęcia są nadal na telefonie",
+                           copies=count_pl(restored, 'kopię', 'kopie', 'kopii')), False)
         if problems:
-            self.error.emit("Nie wszystko udało się cofnąć:\n" + "\n".join(problems[:12]))
+            self.error.emit(tr("Nie wszystko udało się cofnąć:") + "\n" + "\n".join(problems[:12]))
 
     # ------------------------------------------------------------------ #
     # Foldery
@@ -702,17 +710,17 @@ class LibraryController(QObject):
         if media_id is None:
             return False
         if media_id < 0:
-            self.toast.emit("Zakładki działają dla zdjęć w bibliotece — najpierw przeciągnij zdjęcie do folderu",
+            self.toast.emit(tr("Zakładki działają dla zdjęć w bibliotece — najpierw przeciągnij zdjęcie do folderu"),
                             False)
             return False
         if self.mm.is_bookmarked(media_id):
             self.mm.remove_bookmark(media_id)
             state = False
-            self.toast.emit("Usunięto zakładkę", False)
+            self.toast.emit(tr("Usunięto zakładkę"), False)
         else:
             self.mm.add_bookmark(media_id)
             state = True
-            self.toast.emit("Dodano zakładkę — znajdziesz ją w panelu po prawej", False)
+            self.toast.emit(tr("Dodano zakładkę — znajdziesz ją w panelu po prawej"), False)
         self.bookmarks_changed.emit()
         return state
 

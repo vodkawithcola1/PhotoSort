@@ -8,13 +8,14 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QToolButton,
                                QVBoxLayout, QWidget)
 
+from app.i18n import display_folder, tr
 from app.services.geocode_service import map_url
 from app.ui import icons, theme
-from app.utils.formatting import (NO_DATA, date_pl, datetime_pl, human_duration, human_size, parse_iso, time_pl,
-                                  ts_to_dt)
+from app.utils.formatting import (date_pl, datetime_pl, human_duration, human_size, no_data, parse_iso,
+                                  time_pl, ts_to_dt)
 
 SOURCE_TEXT = {
-    "exif": "z metadanych zdjęcia (EXIF)",
+    "exif": "z metadanych zdjęcia (EXIF)",  # i18n: ignore (tłumaczone przy wyświetlaniu)
     "video": "z metadanych filmu",
     "exiftool": "z metadanych (ExifTool)",
     "filename": "odczytana z nazwy pliku",
@@ -58,13 +59,13 @@ class MetadataPanel(QFrame):
         self.chips_box = QHBoxLayout()
         self.chips_box.setSpacing(6)
         top.addLayout(self.chips_box)
-        self.btn_map = QPushButton("Pokaż na mapie")
+        self.btn_map = QPushButton(tr("Pokaż na mapie"))
         self.btn_map.setObjectName("Link")
         self.btn_map.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_map.clicked.connect(self._open_map)
         top.addWidget(self.btn_map)
         self.btn_more = QToolButton()
-        self.btn_more.setToolTip("Więcej informacji")
+        self.btn_more.setToolTip(tr("Więcej informacji"))
         self.btn_more.setCheckable(True)
         self.btn_more.toggled.connect(self._toggle)
         top.addWidget(self.btn_more)
@@ -129,7 +130,7 @@ class MetadataPanel(QFrame):
             dt = datetime.fromisoformat(e.modified.strip()).astimezone().replace(tzinfo=None) if e.modified else None
         except (ValueError, OSError):
             dt = None
-        self.when.setText(f"na telefonie · {datetime_pl(dt)}" if dt else "na telefonie")
+        self.when.setText(tr("na telefonie · {date}", date=datetime_pl(dt)) if dt else tr("na telefonie"))
         chips = [("phone", device_name)]
         if e.size:
             chips.append((None, human_size(e.size)))
@@ -138,9 +139,10 @@ class MetadataPanel(QFrame):
         self._set_chips(chips)
         self.btn_map.hide()
         self._fill_grid([
-            ("Plik", e.name), ("Na telefonie", f"{device_name}/{e.rel}"),
-            ("Data na telefonie", datetime_pl(dt) if dt else NO_DATA), ("Rozmiar", human_size(e.size or None)),
-            ("Status", "jeszcze nie skopiowany — przeciągnij do folderu, aby zapisać na komputerze"),
+            (tr("Plik"), e.name), (tr("Na telefonie"), f"{device_name}/{e.rel}"),
+            (tr("Data na telefonie"), datetime_pl(dt) if dt else no_data()),
+            (tr("Rozmiar"), human_size(e.size or None)),
+            (tr("Status"), tr("jeszcze nie skopiowany — przeciągnij do folderu, aby zapisać na komputerze")),
         ])
 
     def set_row(self, row) -> None:
@@ -155,9 +157,9 @@ class MetadataPanel(QFrame):
         if taken:
             self.when.setText(f"{date_pl(taken)}  ·  {taken.strftime('%H:%M')}")
         elif row["meta_status"] == 0:
-            self.when.setText("Odczytywanie informacji…")
+            self.when.setText(tr("Odczytywanie informacji…"))
         else:
-            self.when.setText("Data wykonania: brak danych")
+            self.when.setText(tr("Data wykonania: brak danych"))
 
         chips = []
         if row["place"]:
@@ -172,30 +174,31 @@ class MetadataPanel(QFrame):
             res = f"{row['width']}×{row['height']}"
             chips.append((None, res + (f"  ({mp:.0f} MP)".replace(".", ",") if row["kind"] == "photo" and mp >= 1 else "")))
         if row["kind"] == "video" and row["duration"]:
-            chips.append(("clock", human_duration(row["duration"]) + (f"  ·  {row['fps']:g} kl/s" if row["fps"] else "")))
+            chips.append(("clock", human_duration(row["duration"]) + (tr("  ·  {fps} kl/s", fps=f"{row['fps']:g}") if row["fps"] else "")))
         chips.append((None, human_size(row["size"])))
         chips.append((None, FORMAT_NAMES.get((row["ext"] or "").lower(), (row["ext"] or "").upper().lstrip("."))))
         self._set_chips(chips)
         self.btn_map.setVisible(row["lat"] is not None)
 
         src = SOURCE_TEXT.get(row["taken_source"] or "", "")
+        src = tr(src) if src else ""  # i18n: ignore
         items = [
-            ("Data wykonania", (date_pl(taken) + (f"  ({src})" if src else "")) if taken else NO_DATA),
-            ("Godzina wykonania", time_pl(taken) if taken else NO_DATA),
-            ("Utworzenie pliku (Windows)", datetime_pl(ts_to_dt(row["file_created"]))),
-            ("Modyfikacja pliku (Windows)", datetime_pl(ts_to_dt(row["file_modified"]))),
-            ("Import do biblioteki (PhotoSort)", datetime_pl(ts_to_dt(row["imported_at"]))),
-            ("Lokalizacja", row["place"] or NO_DATA),
-            ("Współrzędne GPS", f"{row['lat']:.6f}, {row['lon']:.6f}" if row["lat"] is not None else NO_DATA),
-            ("Urządzenie", device_name(row["make"], row["model"]) or NO_DATA),
-            ("Rozdzielczość", f"{row['width']} × {row['height']} px" if row["width"] else NO_DATA),
-            ("Rozmiar pliku", human_size(row["size"])),
-            ("Format", FORMAT_NAMES.get((row["ext"] or "").lower(), row["ext"] or NO_DATA)),
-            ("Folder", row["folder"]),
+            (tr("Data wykonania"), (date_pl(taken) + (f"  ({src})" if src else "")) if taken else no_data()),
+            (tr("Godzina wykonania"), time_pl(taken) if taken else no_data()),
+            (tr("Utworzenie pliku (Windows)"), datetime_pl(ts_to_dt(row["file_created"]))),
+            (tr("Modyfikacja pliku (Windows)"), datetime_pl(ts_to_dt(row["file_modified"]))),
+            (tr("Import do biblioteki (PhotoSort)"), datetime_pl(ts_to_dt(row["imported_at"]))),
+            (tr("Lokalizacja"), row["place"] or no_data()),
+            (tr("Współrzędne GPS"), f"{row['lat']:.6f}, {row['lon']:.6f}" if row["lat"] is not None else no_data()),
+            (tr("Urządzenie"), device_name(row["make"], row["model"]) or no_data()),
+            (tr("Rozdzielczość"), f"{row['width']} × {row['height']} px" if row["width"] else no_data()),
+            (tr("Rozmiar pliku"), human_size(row["size"])),
+            (tr("Format"), FORMAT_NAMES.get((row["ext"] or "").lower(), row["ext"] or no_data())),
+            (tr("Folder"), display_folder(row["folder"])),
         ]
         if row["kind"] == "video":
-            items.insert(10, ("Długość filmu", human_duration(row["duration"]) if row["duration"] else NO_DATA))
-            items.insert(11, ("Klatki na sekundę", f"{row['fps']:g}" if row["fps"] else NO_DATA))
+            items.insert(10, (tr("Długość filmu"), human_duration(row["duration"]) if row["duration"] else no_data()))
+            items.insert(11, (tr("Klatki na sekundę"), f"{row['fps']:g}" if row["fps"] else no_data()))
         self._fill_grid(items)
 
     def _set_chips(self, chips) -> None:

@@ -5,15 +5,16 @@ import threading
 from collections import OrderedDict
 from pathlib import Path
 
-from PySide6.QtCore import (QEasingCurve, QObject, QPointF, QRectF, QSizeF, Qt, QTimer, QUrl,
+from PySide6.QtCore import (QEasingCurve, QObject, QSizeF, Qt, QUrl,
                             QVariantAnimation, Signal)
-from PySide6.QtGui import QColor, QDesktopServices, QImage, QPainter, QPixmap
+from PySide6.QtGui import QDesktopServices, QImage, QPainter, QPixmap
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
 from PySide6.QtWidgets import (QApplication, QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView,
                                QHBoxLayout, QLabel, QProgressBar, QPushButton, QSlider, QStackedWidget, QToolButton,
                                QVBoxLayout, QWidget)
 
+from app.i18n import tr
 from app.services.thumbnail_service import load_display_image, pil_to_qimage, video_frame_image
 from app.ui import icons, theme
 from app.ui.wrap_fix import refit
@@ -96,7 +97,7 @@ class ImageLoader(QObject):
                 else:
                     img = load_display_image(path)
                 if img.isNull():
-                    raise ValueError("nie udało się odczytać obrazu")
+                    raise ValueError("nie udało się odczytać obrazu")  # i18n: ignore
             except Exception as exc:
                 if primary:
                     self.failed.emit(mid, str(exc))
@@ -357,14 +358,14 @@ class VideoView(QWidget):
         eb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.error_icon = QLabel()
         self.error_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.error_title = QLabel("Nie można odtworzyć tego filmu")
+        self.error_title = QLabel(tr("Nie można odtworzyć tego filmu"))
         self.error_title.setObjectName("EmptyTitle")
         self.error_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.error_text = QLabel()
         self.error_text.setObjectName("Muted")
         self.error_text.setWordWrap(True)
         self.error_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.error_btn = QPushButton("Otwórz w domyślnym odtwarzaczu Windows")
+        self.error_btn = QPushButton(tr("Otwórz w domyślnym odtwarzaczu Windows"))
         self.error_btn.clicked.connect(self._open_external)
         eb.addWidget(self.error_icon)
         eb.addWidget(self.error_title)
@@ -379,7 +380,7 @@ class VideoView(QWidget):
         cl.setContentsMargins(12, 6, 12, 8)
         cl.setSpacing(8)
         self.btn_play = QToolButton()
-        self.btn_play.setToolTip("Odtwórz / pauza (spacja)")
+        self.btn_play.setToolTip(tr("Odtwórz / pauza (spacja)"))
         self.btn_play.clicked.connect(self.toggle_play)
         self.lbl_pos = QLabel("0:00")
         self.lbl_pos.setObjectName("Muted")
@@ -391,16 +392,16 @@ class VideoView(QWidget):
         self.lbl_dur = QLabel("0:00")
         self.lbl_dur.setObjectName("Muted")
         self.btn_mute = QToolButton()
-        self.btn_mute.setToolTip("Wycisz")
+        self.btn_mute.setToolTip(tr("Wycisz"))
         self.btn_mute.clicked.connect(self.toggle_mute)
         self.vol = QSlider(Qt.Orientation.Horizontal)
         self.vol.setRange(0, 100)
         self.vol.setValue(80)
         self.vol.setFixedWidth(90)
-        self.vol.setToolTip("Głośność")
+        self.vol.setToolTip(tr("Głośność"))
         self.vol.valueChanged.connect(lambda v: (self.audio.setVolume(v / 100), self._update_icons()))
         self.btn_full = QToolButton()
-        self.btn_full.setToolTip("Pełny ekran (F11)")
+        self.btn_full.setToolTip(tr("Pełny ekran (F11)"))
         self.btn_full.clicked.connect(self.fullscreen_requested)
         for w in (self.btn_play, self.lbl_pos):
             cl.addWidget(w)
@@ -490,9 +491,9 @@ class VideoView(QWidget):
         self.error_icon.setPixmap(icons.pixmap("warning", 40, theme.current()["text3"]))
         self.error_text.setFixedWidth(min(520, max(260, self.width() - 60)))
         self.error_text.setText(
-            "Ten format lub kodek nie jest obsługiwany przez wbudowany odtwarzacz.\n"
-            "Plik jest bezpieczny — możesz go nadal przenosić do folderów."
-            + (f"\n\nSzczegóły: {msg}" if msg else ""))
+            tr("Ten format lub kodek nie jest obsługiwany przez wbudowany odtwarzacz.\n"
+               "Plik jest bezpieczny — możesz go nadal przenosić do folderów.")
+            + (tr("\n\nSzczegóły: {details}", details=msg) if msg else ""))
         refit(self.error_text)
         self.error_box.show()
         self.error_box.setGeometry(self.rect())
@@ -613,8 +614,8 @@ class MediaViewer(QWidget):
         self.video.fullscreen_requested.connect(self.fullscreen_requested)
         self.empty.action.connect(self.empty_action)
 
-        self.btn_prev = self._overlay("chevron_left", "Poprzedni (←)", self.prev_requested.emit)
-        self.btn_next = self._overlay("chevron_right", "Następny (→)", self.next_requested.emit)
+        self.btn_prev = self._overlay("chevron_left", tr("Poprzedni (←)"), self.prev_requested.emit)
+        self.btn_next = self._overlay("chevron_right", tr("Następny (→)"), self.next_requested.emit)
 
         self.toolbar = QFrame(self)
         self.toolbar.setObjectName("Toast")
@@ -622,11 +623,11 @@ class MediaViewer(QWidget):
         tl.setContentsMargins(6, 4, 6, 4)
         tl.setSpacing(2)
         self.tb_buttons = {}
-        for name, tip, fn in (("zoom_out", "Pomniejsz (−)", lambda: self.image.zoom(1 / 1.25)),
-                              ("fit", "Dopasuj do okna (0)", self.image.fit),
-                              ("zoom_in", "Powiększ (+)", lambda: self.image.zoom(1.25)),
-                              ("rotate", "Obróć podgląd (R)", self.rotate),
-                              ("fullscreen", "Pełny ekran (F11)", self.fullscreen_requested.emit)):
+        for name, tip, fn in (("zoom_out", tr("Pomniejsz (−)"), lambda: self.image.zoom(1 / 1.25)),
+                              ("fit", tr("Dopasuj do okna (0)"), self.image.fit),
+                              ("zoom_in", tr("Powiększ (+)"), lambda: self.image.zoom(1.25)),
+                              ("rotate", tr("Obróć podgląd (R)"), self.rotate),
+                              ("fullscreen", tr("Pełny ekran (F11)"), self.fullscreen_requested.emit)):
             b = QToolButton()
             b.setToolTip(tip)
             b.clicked.connect(fn)

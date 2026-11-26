@@ -5,10 +5,11 @@ from PySide6.QtCore import QModelIndex, QRectF, QSize, Qt, QVariantAnimation, Si
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
                                QListWidgetItem, QMenu, QPushButton, QStyle, QStyledItemDelegate,
-                               QToolButton, QVBoxLayout, QWidget)
+                               QToolButton, QVBoxLayout)
 
 from app.constants import MIME_MEDIA_IDS, SCOPE_ALL, SCOPE_DEVICE, UNSORTED_FOLDER
 from app.core.library_controller import LibraryController
+from app.i18n import display_folder, tr
 from app.ui import icons, theme
 from app.ui.dialogs import TextPrompt, confirm
 from app.ui.drag import ids_from_mime
@@ -84,10 +85,10 @@ class FolderDelegate(QStyledItemDelegate):
         p.setPen(text_color)
         f = theme.ui_font(10, QFont.Weight.DemiBold if (is_scope or kind == "unsorted") else QFont.Weight.Normal)
         p.setFont(f)
-        tr = QRectF(r.left() + 40, r.top(), crect.left() - r.left() - 46, r.height())
+        name_rect = QRectF(r.left() + 40, r.top(), crect.left() - r.left() - 46, r.height())
         elided = p.fontMetrics().elidedText(index.data(Qt.ItemDataRole.DisplayRole), Qt.TextElideMode.ElideRight,
-                                            int(tr.width()))
-        p.drawText(tr, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
+                                            int(name_rect.width()))
+        p.drawText(name_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, elided)
         if is_drop:
             p.setPen(QPen(QColor(255, 255, 255, 180), 1.5))
             p.setBrush(Qt.BrushStyle.NoBrush)
@@ -188,7 +189,7 @@ class NewFolderDrop(QPushButton):
     dropped = Signal(list)
 
     def __init__(self, parent=None):
-        super().__init__("Nowy folder", parent)
+        super().__init__(tr("Nowy folder"), parent)
         self.setAcceptDrops(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(38)
@@ -196,7 +197,7 @@ class NewFolderDrop(QPushButton):
     def dragEnterEvent(self, e) -> None:
         if e.mimeData().hasFormat(MIME_MEDIA_IDS):
             e.acceptProposedAction()
-            self.setText("Upuść, aby utworzyć nowy folder")
+            self.setText(tr("Upuść, aby utworzyć nowy folder"))
             self.setObjectName("Primary")
             self.style().unpolish(self)
             self.style().polish(self)
@@ -214,7 +215,7 @@ class NewFolderDrop(QPushButton):
             self.dropped.emit(ids)
 
     def _reset(self) -> None:
-        self.setText("Nowy folder")
+        self.setText(tr("Nowy folder"))
         self.setObjectName("")
         self.style().unpolish(self)
         self.style().polish(self)
@@ -232,19 +233,19 @@ class FolderPanel(QFrame):
 
         head = QHBoxLayout()
         head.setContentsMargins(8, 0, 2, 0)
-        t = QLabel("Foldery")
+        t = QLabel(tr("Foldery"))
         t.setObjectName("H2")
         head.addWidget(t)
         head.addStretch(1)
         self.btn_add = QToolButton()
-        self.btn_add.setToolTip("Utwórz nowy folder")
+        self.btn_add.setToolTip(tr("Utwórz nowy folder"))
         self.btn_add.clicked.connect(self.new_folder)
         head.addWidget(self.btn_add)
         lay.addLayout(head)
 
         self.search = QLineEdit()
         self.search.setObjectName("Search")
-        self.search.setPlaceholderText("Szukaj folderu")
+        self.search.setPlaceholderText(tr("Szukaj folderu"))
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.refresh)
         self.search_icon = QLabel(self.search)
@@ -270,12 +271,12 @@ class FolderPanel(QFrame):
 
         bh = QHBoxLayout()
         bh.setContentsMargins(8, 2, 2, 0)
-        self.bm_title = QLabel("ZAKŁADKI")
+        self.bm_title = QLabel(tr("ZAKŁADKI"))
         self.bm_title.setObjectName("SectionTitle")
         bh.addWidget(self.bm_title)
         bh.addStretch(1)
         self.bm_toggle = QToolButton()
-        self.bm_toggle.setToolTip("Pokaż / ukryj zakładki")
+        self.bm_toggle.setToolTip(tr("Pokaż / ukryj zakładki"))
         self.bm_toggle.clicked.connect(self._toggle_bm)
         bh.addWidget(self.bm_toggle)
         lay.addLayout(bh)
@@ -285,7 +286,7 @@ class FolderPanel(QFrame):
         self.bm_list.itemClicked.connect(lambda it: self.ctrl.go_to_media(it.data(Qt.ItemDataRole.UserRole)))
         self.bm_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.bm_list.customContextMenuRequested.connect(self._bm_menu)
-        self.bm_empty = QLabel("Kliknij ikonę zakładki na górze, aby oznaczyć zdjęcie, do którego chcesz wrócić.")
+        self.bm_empty = QLabel(tr("Kliknij ikonę zakładki na górze, aby oznaczyć zdjęcie, do którego chcesz wrócić."))
         self.bm_empty.setObjectName("Faint")
         self.bm_empty.setWordWrap(True)
         self.bm_empty.setContentsMargins(8, 0, 8, 0)
@@ -342,24 +343,25 @@ class FolderPanel(QFrame):
         if not q and self.ctrl.device is not None:
             status = self.ctrl.device_status
             n = len(self.ctrl.device_order)
-            label = f"Telefon: {self.ctrl.device_name}"
+            label = tr("Telefon: {name}", name=self.ctrl.device_name)
             add(label, SCOPE_DEVICE, n, "device")
             it = self.list.item(self.list.count() - 1)
-            it.setToolTip("Zdjęcia na telefonie, których jeszcze nie ma w bibliotece. Przeciągnij zdjęcie "
-                          "na folder, aby skopiować je prosto do tego folderu.\n"
-                          + ("Wczytywanie listy…" if status == "scanning" else f"Do przejrzenia: {n}"))
+            it.setToolTip(tr("Zdjęcia na telefonie, których jeszcze nie ma w bibliotece. Przeciągnij zdjęcie "
+                             "na folder, aby skopiować je prosto do tego folderu.") + "\n"
+                          + (tr("Wczytywanie listy…") if status == "scanning"
+                             else tr("Do przejrzenia: {count}", count=n)))
         if not q:
             for f in folders:
                 if f.is_unsorted:
-                    add(f.name, f.name, f.count, "unsorted")
-            add("Wszystkie multimedia", SCOPE_ALL, total, "all")
-            add("FOLDERY TEMATYCZNE" if topic else "", None, 0, "header")
+                    add(display_folder(f.name), f.name, f.count, "unsorted")
+            add(tr("Wszystkie multimedia"), SCOPE_ALL, total, "all")
+            add(tr("FOLDERY TEMATYCZNE") if topic else "", None, 0, "header")
         for f in topic:
             if q and q not in f.name.lower():
                 continue
             add(f.name, f.name, f.count, "folder")
         if not topic and not q:
-            hint = QListWidgetItem("Utwórz pierwszy folder, np. „Święta 2026”")
+            hint = QListWidgetItem(tr("Utwórz pierwszy folder, np. „Święta 2026”"))
             hint.setData(KIND_ROLE, "header")
             hint.setFlags(Qt.ItemFlag.NoItemFlags)
             self.list.addItem(hint)
@@ -370,8 +372,10 @@ class FolderPanel(QFrame):
         self.list.viewport().update()
 
     def _stats(self, s: dict) -> None:
-        self.footer.setText(f"{format_int(s['photos'])} zdjęć · {format_int(s['videos'])} filmów · "
-                            f"{count_pl(s['folders'], 'folder', 'foldery', 'folderów')}")
+        self.footer.setText(tr("{photos} · {videos} · {folders}",
+                               photos=count_pl(s['photos'], 'zdjęcie', 'zdjęcia', 'zdjęć'),
+                               videos=count_pl(s['videos'], 'film', 'filmy', 'filmów'),
+                               folders=count_pl(s['folders'], 'folder', 'foldery', 'folderów')))
 
     # -- akcje ------------------------------------------------------------
     def _clicked(self, item: QListWidgetItem) -> None:
@@ -385,15 +389,18 @@ class FolderPanel(QFrame):
             self.list.flash_folder(folder)
 
     def _drop_new(self, ids: list) -> None:
-        name = TextPrompt.ask(self, "Nowy folder", f"Utwórz folder i przenieś do niego "
-                              f"{count_pl(len(ids), 'plik', 'pliki', 'plików')}.", "", "Utwórz i przenieś")
+        name = TextPrompt.ask(self, tr("Nowy folder"),
+                              tr("Utwórz folder i przenieś do niego {files}.",
+                                 files=count_pl(len(ids), 'plik', 'pliki', 'plików')),
+                              "", tr("Utwórz i przenieś"))
         if name:
             created = self.ctrl.create_folder(name)
             if created:
                 self._dropped(ids, created)
 
     def new_folder(self) -> None:
-        name = TextPrompt.ask(self, "Nowy folder", "Podaj nazwę folderu, np. „Wakacje Sarbinowo”.", "", "Utwórz")
+        name = TextPrompt.ask(self, tr("Nowy folder"), tr("Podaj nazwę folderu, np. „Wakacje Sarbinowo”."), "",
+                              tr("Utwórz"))
         if name:
             self.ctrl.create_folder(name)
 
@@ -401,9 +408,9 @@ class FolderPanel(QFrame):
         item = self.list.itemAt(pos)
         if item is not None and item.data(KIND_ROLE) == "device":
             m = QMenu(self)
-            m.addAction(icons.icon("open"), "Pokaż zdjęcia z telefonu").triggered.connect(
+            m.addAction(icons.icon("open"), tr("Pokaż zdjęcia z telefonu")).triggered.connect(
                 lambda: self.ctrl.set_scope(SCOPE_DEVICE))
-            m.addAction(icons.icon("close"), "Zakończ przeglądanie telefonu").triggered.connect(
+            m.addAction(icons.icon("close"), tr("Zakończ przeglądanie telefonu")).triggered.connect(
                 lambda: self.ctrl.close_device())
             m.exec(self.list.viewport().mapToGlobal(pos))
             return
@@ -412,25 +419,26 @@ class FolderPanel(QFrame):
         name = item.data(NAME_ROLE)
         kind = item.data(KIND_ROLE)
         m = QMenu(self)
-        m.addAction(icons.icon("open"), "Otwórz").triggered.connect(lambda: self.ctrl.set_scope(name))
+        m.addAction(icons.icon("open"), tr("Otwórz")).triggered.connect(lambda: self.ctrl.set_scope(name))
         if kind == "folder":
-            m.addAction(icons.icon("edit"), "Zmień nazwę…").triggered.connect(lambda: self._rename(name))
-            de = m.addAction(icons.icon("trash"), "Usuń pusty folder")
+            m.addAction(icons.icon("edit"), tr("Zmień nazwę…")).triggered.connect(lambda: self._rename(name))
+            de = m.addAction(icons.icon("trash"), tr("Usuń pusty folder"))
             de.setEnabled((item.data(COUNT_ROLE) or 0) == 0)
             de.triggered.connect(lambda: self._delete(name))
         if kind != "all":
             m.addSeparator()
-            m.addAction(icons.icon("computer"), "Pokaż w Eksploratorze").triggered.connect(
+            m.addAction(icons.icon("computer"), tr("Pokaż w Eksploratorze")).triggered.connect(
                 lambda: reveal_in_explorer(self.ctrl.lib.root / name))
         m.exec(self.list.viewport().mapToGlobal(pos))
 
     def _rename(self, name: str) -> None:
-        new = TextPrompt.ask(self, "Zmień nazwę folderu", f"Nowa nazwa dla „{name}”:", name, "Zmień nazwę")
+        new = TextPrompt.ask(self, tr("Zmień nazwę folderu"), tr("Nowa nazwa dla „{name}”:", name=name), name,
+                             tr("Zmień nazwę"))
         if new and new != name:
             self.ctrl.rename_folder(name, new)
 
     def _delete(self, name: str) -> None:
-        if confirm(self, "Usuń folder", f"Usunąć pusty folder „{name}”?", "Usuń"):
+        if confirm(self, tr("Usuń folder"), tr("Usunąć pusty folder „{name}”?", name=display_folder(name)), tr("Usuń")):
             self.ctrl.delete_folder(name)
 
     # -- zakładki ---------------------------------------------------------
@@ -439,11 +447,12 @@ class FolderPanel(QFrame):
         rows = self.ctrl.mm.bookmarks()
         for r in rows:
             it = QListWidgetItem(icons.icon("bookmark_fill", theme.current()["accent"], 16),
-                                 f"{r['filename']}  ·  {r['folder']}")
+                                 f"{r['filename']}  ·  {display_folder(r['folder'])}")
             it.setData(Qt.ItemDataRole.UserRole, r["media_id"])
-            it.setToolTip(f"{r['filename']}\nFolder: {r['folder']}\nKliknij, aby przejść do tego pliku.")
+            it.setToolTip(tr("{filename}\nFolder: {folder}\nKliknij, aby przejść do tego pliku.",
+                             filename=r['filename'], folder=display_folder(r['folder'])))
             self.bm_list.addItem(it)
-        self.bm_title.setText(f"ZAKŁADKI ({len(rows)})" if rows else "ZAKŁADKI")
+        self.bm_title.setText(tr("ZAKŁADKI ({count})", count=len(rows)) if rows else tr("ZAKŁADKI"))
         self.bm_list.setVisible(self._bm_visible and bool(rows))
         self.bm_empty.setVisible(self._bm_visible and not rows)
         self.bm_list.setFixedHeight(min(170, 34 * len(rows) + 6) if rows else 0)
@@ -459,6 +468,6 @@ class FolderPanel(QFrame):
             return
         mid = it.data(Qt.ItemDataRole.UserRole)
         m = QMenu(self)
-        m.addAction("Przejdź do pliku").triggered.connect(lambda: self.ctrl.go_to_media(mid))
-        m.addAction(icons.icon("trash"), "Usuń zakładkę").triggered.connect(lambda: self.ctrl.toggle_bookmark(mid))
+        m.addAction(tr("Przejdź do pliku")).triggered.connect(lambda: self.ctrl.go_to_media(mid))
+        m.addAction(icons.icon("trash"), tr("Usuń zakładkę")).triggered.connect(lambda: self.ctrl.toggle_bookmark(mid))
         m.exec(self.bm_list.viewport().mapToGlobal(pos))

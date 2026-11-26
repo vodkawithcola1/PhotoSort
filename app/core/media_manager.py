@@ -10,6 +10,7 @@ from pathlib import Path
 
 from app.constants import SCOPE_ALL, UNSORTED_FOLDER
 from app.core.library_manager import Library, LibraryError, rel_of
+from app.i18n import display_folder, tr
 from app.utils.paths import unique_path
 
 
@@ -166,7 +167,7 @@ class MediaManager:
         result = MoveResult()
         target_dir = self.lib.root / target_folder
         if not target_dir.is_dir():
-            raise LibraryError(f"Folder „{target_folder}” nie istnieje.")
+            raise LibraryError(tr("Folder „{folder}” nie istnieje.", folder=display_folder(target_folder)))
         batch = self._next_batch()
         for mid in ids:
             row = self.get(mid)
@@ -190,7 +191,7 @@ class MediaManager:
                   batch: int, state_after: str = "done") -> tuple[bool, str]:
         src = self.lib.abs_path(src_rel)
         if not src.exists():
-            return False, "plik nie istnieje na dysku (mógł zostać usunięty poza programem)"
+            return False, tr("plik nie istnieje na dysku (mógł zostać usunięty poza programem)")
         target_dir = self.lib.root / target_folder
         for _attempt in range(5):
             dst = unique_path(target_dir, filename)
@@ -220,7 +221,7 @@ class MediaManager:
                 # plik JEST już przeniesiony; wpis 'pending' zostanie domknięty przy następnym otwarciu
                 return True, ""
             return True, ""
-        return False, "nie udało się nadać unikalnej nazwy"
+        return False, tr("nie udało się nadać unikalnej nazwy")
 
     def can_undo(self) -> bool:
         return self.db.scalar("SELECT 1 FROM moves WHERE state='done' LIMIT 1") is not None
@@ -324,7 +325,7 @@ def _safe_move(src: Path, dst: Path) -> None:
     try:
         shutil.copy2(src, tmp)
         if os.path.getsize(tmp) != os.path.getsize(src):
-            raise OSError("weryfikacja kopii nie powiodła się")
+            raise OSError(tr("weryfikacja kopii nie powiodła się"))
         os.rename(tmp, dst)
     except BaseException:
         try:
@@ -346,9 +347,9 @@ def _safe_move(src: Path, dst: Path) -> None:
 
 def _os_error_text(exc: OSError) -> str:
     if exc.errno == errno.ENOSPC or getattr(exc, "winerror", None) in (39, 112):
-        return "brak miejsca na dysku"
+        return tr("brak miejsca na dysku")
     if getattr(exc, "winerror", None) == 32 or exc.errno == errno.EACCES:
-        return "plik jest używany przez inny program lub brak uprawnień"
+        return tr("plik jest używany przez inny program lub brak uprawnień")
     return exc.strerror or str(exc)
 
 
